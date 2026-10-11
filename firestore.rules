@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{code} {
+      allow get, create, update: if request.auth != null && code.size() >= 20;
+      allow list, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,1510 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Familieplanlægger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: fast sidebar til moduler på desktop, scrollbar bundmenu på mobil. Rolige nordiske toner, fjordgrøn accent. */
+:root{
+  --bg:#F2F4F3; --surface:#FFFFFF; --surface2:#F6F8F7; --ink:#1D2B2F; --muted:#5F7277; --line:#DCE2E0;
+  --accent:#2D6A6E; --accent-ink:#FFFFFF; --accent-soft:#E0EEEC;
+  --good:#2E7D4F; --good-soft:#DFF1E6; --good-ink:#1F5E3A;
+  --warn:#9A5A14; --warn-soft:#F8EBD7;
+  --danger:#B3453F; --danger-soft:#F8E3E1;
+  --note1:#FAEFC8; --note2:#DCEFE6; --note3:#E0E8F6; --note4:#F5DFE3;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A1C; --surface:#1A2326; --surface2:#202B2E; --ink:#E6EEEC; --muted:#9AAEB1; --line:#2C3A3D;
+    --accent:#6FB7B8; --accent-ink:#0F1B1D; --accent-soft:#203638;
+    --good:#6CC592; --good-soft:#1F3A2B; --good-ink:#A6E3C0;
+    --warn:#E0A24F; --warn-soft:#3A2D18;
+    --danger:#E27D76; --danger-soft:#3D2321;
+    --note1:#3D3622; --note2:#22372E; --note3:#243146; --note4:#3F2830;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A1C; --surface:#1A2326; --surface2:#202B2E; --ink:#E6EEEC; --muted:#9AAEB1; --line:#2C3A3D;
+  --accent:#6FB7B8; --accent-ink:#0F1B1D; --accent-soft:#203638;
+  --good:#6CC592; --good-soft:#1F3A2B; --good-ink:#A6E3C0;
+  --warn:#E0A24F; --warn-soft:#3A2D18;
+  --danger:#E27D76; --danger-soft:#3D2321;
+  --note1:#3D3622; --note2:#22372E; --note3:#243146; --note4:#3F2830;
+  color-scheme: dark;
+}
+body{background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.font-display{font-family:"Bricolage Grotesque",Figtree,system-ui,sans-serif}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;border-radius:10px;padding:.55rem .9rem;font-size:.875rem;font-weight:600;line-height:1.2;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s,filter .15s}
+.btn:hover{background:var(--surface2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{background:var(--accent);filter:brightness(1.1)}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-sm{padding:.35rem .65rem;font-size:.8rem;border-radius:8px}
+.btn-danger{color:var(--danger)}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;color:var(--muted);background:transparent;border:0;cursor:pointer;flex-shrink:0}
+.iconbtn:hover{background:var(--surface2);color:var(--ink)}
+.iconbtn:disabled{opacity:.3;cursor:default}
+.field{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:.55rem .75rem;font-size:.9rem;font-family:inherit}
+.field:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.field::placeholder{color:var(--muted);opacity:.8}
+@media (max-width:640px){.field{font-size:16px}}
+.lbl{display:block;font-size:.7rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.chip{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;border-radius:999px;font-size:.8rem;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-family:inherit}
+.chip:hover{background:var(--surface2)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:2px}
+.seg button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:.8rem;padding:.3rem .75rem;border-radius:8px;cursor:pointer;font-family:inherit}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tnum{font-variant-numeric:tabular-nums}
+.navbtn{display:flex;align-items:center;gap:.7rem;width:100%;padding:.55rem .75rem;border-radius:10px;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:.92rem;cursor:pointer;font-family:inherit;text-align:left}
+.navbtn:hover{background:var(--surface2);color:var(--ink)}
+.navbtn[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.tabbtn{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:74px;padding:.45rem .5rem;border:0;background:transparent;color:var(--muted);font-size:.68rem;font-weight:600;cursor:pointer;font-family:inherit;border-radius:10px}
+.tabbtn[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+.noscroll{scrollbar-width:none}.noscroll::-webkit-scrollbar{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.pop{animation:pop .18s ease-out}
+</style>
+<style>
+:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: {
+    canvas:'var(--bg)', surface:'var(--surface)', surface2:'var(--surface2)', ink:'var(--ink)', muted:'var(--muted)', line:'var(--line)',
+    accent:'var(--accent)', accentink:'var(--accent-ink)', accentsoft:'var(--accent-soft)',
+    good:'var(--good)', goodsoft:'var(--good-soft)', goodink:'var(--good-ink)',
+    warn:'var(--warn)', warnsoft:'var(--warn-soft)', danger:'var(--danger)', dangersoft:'var(--danger-soft)'
+  },
+  fontFamily: { display:['"Bricolage Grotesque"','Figtree','system-ui','sans-serif'], sans:['Figtree','system-ui','sans-serif'] }
+} } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* ---------- ikoner (Lucide-stil, inline) ---------- */
+const ICONS = {
+  plus:'<path d="M5 12h14M12 5v14"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  left:'<path d="m15 18-6-6 6-6"/>',
+  right:'<path d="m9 18 6-6-6-6"/>',
+  trash:'<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/>',
+  pencil:'<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+  copy:'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  cake:'<path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01"/>',
+  cart:'<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  utensils:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  dumbbell:'<path d="m6.5 6.5 11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 10l7-7M14 21l7-7"/>',
+  listchecks:'<path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/>',
+  pin:'<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  tag:'<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><path d="M7.5 7.5h.01"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-2.93 1.41-1.41m11.32-11.32 1.41-1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  pinmap:'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>',
+  reset:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  list:'<path d="M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13"/>',
+  sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+  loader:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>'
+};
+function Icon({ name, size = 18, sw = 1.8, className = '' }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw}
+    strokeLinecap="round" strokeLinejoin="round" className={'shrink-0 ' + className} aria-hidden="true"
+    dangerouslySetInnerHTML={{ __html: ICONS[name] || '' }} />;
+}
+
+/* ---------- dato-hjælpere ---------- */
+const DAYS = ['Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag','Søndag'];
+const DS = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+const MONTHS = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
+const MS = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+const pad = n => String(n).padStart(2, '0');
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const dayIdx = d => (d.getDay() + 6) % 7;
+const startOfWeek = d => addDays(startOfDay(d), -dayIdx(d));
+const isLeap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+const isoWeek = d => {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dn);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+};
+const fmtLong = d => `${DAYS[dayIdx(d)]} ${d.getDate()}. ${MONTHS[d.getMonth()]}`;
+const fmtShort = d => `${d.getDate()}. ${MS[d.getMonth()]}`;
+const uid = () => Math.random().toString(36).slice(2, 9);
+const toMin = t => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const fromMin = n => `${pad(Math.floor(n / 60) % 24)}:${pad(n % 60)}`;
+const byTime = (a, b) => (a.start || '').localeCompare(b.start || '');
+const num = n => Number(n).toLocaleString('da-DK', { maximumFractionDigits: 2 });
+
+function nextBirthday(dateStr, today) {
+  const b = parse(dateStr), m = b.getMonth(), dd = b.getDate();
+  const mk = y => { let d = new Date(y, m, dd); if (m === 1 && dd === 29 && d.getMonth() !== 1) d = new Date(y, 1, 28); return d; };
+  let n = mk(today.getFullYear());
+  if (n < today) n = mk(today.getFullYear() + 1);
+  const days = Math.round((n - today) / 86400000);
+  const turning = n.getFullYear() - b.getFullYear();
+  return { date: n, days, turning, age: days === 0 ? turning : turning - 1 };
+}
+function birthdaysOn(list, date) {
+  return list.filter(b => {
+    const x = parse(b.date), y = date.getFullYear();
+    if (y < x.getFullYear()) return false;
+    let m = x.getMonth(), d = x.getDate();
+    if (m === 1 && d === 29 && !isLeap(y)) d = 28;
+    return date.getMonth() === m && date.getDate() === d;
+  });
+}
+
+/* ---------- varekategorier og tilbud ---------- */
+const CATS = [
+  { id: 'frugt', name: 'Frugt & grønt', kw: ['banan','æble','pære','appelsin','citron','agurk','tomat','løg','kartof','gulerod','salat','peberfrugt','broccoli','squash','spinat','hvidløg','avocado','svamp','champignon','blomkål','kål','drue','jordbær','ingefær','porre','persille','basilikum','mandarin','selleri','bær','majs'] },
+  { id: 'mejeri', name: 'Mejeri & æg', kw: ['mælk','æg','smør','ost','yoghurt','skyr','fløde','fraiche','mozzarella','parmesan','feta','kvark','cheddar','remoulade'] },
+  { id: 'koed', name: 'Kød & fisk', kw: ['kylling','hakket','okse','svine','bacon','pølse','laks','torsk','fisk','rejer','skinke','pålæg','frikadelle','kød','medister','flæsk','bøf','kalkun','leverpostej','sild','tun','pepperoni'] },
+  { id: 'broed', name: 'Brød & kolonial', kw: ['brød','rugbrød','toast','havregryn','müsli','pasta','spaghetti','ris','mel','sukker','kaffe','bønner','linser','sauce','ketchup','olie','eddike','krydder','salt','peber','nudler','cornflakes','knækbrød','marmelade','honning','bulgur','couscous','tortilla','rundstykke','kiks','chokolade','chips','nødder','gær','bouillon','burgerbolle','tomatpuré','dåse'] },
+  { id: 'frost', name: 'Frost', kw: ['frost','frosne','pizza','ærter','fiskefilet','pommes','vaniljeis','flødeis'] },
+  { id: 'drikke', name: 'Drikkevarer', kw: ['juice','vand','sodavand','cola','øl','vin','saft','kakao','læsk'] },
+  { id: 'hush', name: 'Husholdning', kw: ['toiletpapir','køkkenrulle','opvask','vaskemiddel','skyllemiddel','affald','sæbe','shampoo','tandpasta','ble','serviet','svamp','rengøring','batteri','bagepapir','folie'] },
+  { id: 'andet', name: 'Andet', kw: [] }
+];
+const GUESS_ORDER = ['frost','hush','drikke','koed','mejeri','frugt','broed'];
+function matchKw(name, kw) {
+  const n = name.toLowerCase();
+  const tokens = n.split(/[^a-zæøåéüö0-9]+/).filter(Boolean);
+  return kw.some(k => k.length <= 4 ? tokens.some(t => t.startsWith(k)) : n.includes(k));
+}
+function guessCat(name) {
+  for (const id of GUESS_ORDER) { if (matchKw(name, CATS.find(c => c.id === id).kw)) return id; }
+  return 'andet';
+}
+const QUICK = [
+  ['Mælk','mejeri'],['Æg','mejeri'],['Smør','mejeri'],['Ost','mejeri'],['Yoghurt','mejeri'],
+  ['Rugbrød','broed'],['Havregryn','broed'],['Pasta','broed'],['Ris','broed'],['Kaffe','broed'],
+  ['Bananer','frugt'],['Æbler','frugt'],['Agurk','frugt'],['Løg','frugt'],['Kartofler','frugt'],['Gulerødder','frugt'],
+  ['Hakket oksekød','koed'],['Kyllingebryst','koed'],['Frosne ærter','frost'],['Juice','drikke'],
+  ['Toiletpapir','hush'],['Opvasketabs','hush'],['Køkkenrulle','hush']
+];
+const STORES = ['Rema 1000', 'Netto', 'Føtex', 'Bilka'];
+const DEALS = [
+  { kw:['mælk'], item:'Letmælk 1 l', store:'Rema 1000', price:8, was:12.95 },
+  { kw:['æg'], item:'Skrabeæg 10 stk.', store:'Netto', price:22, was:29 },
+  { kw:['smør'], item:'Smør 250 g', store:'Føtex', price:15, was:21 },
+  { kw:['ost'], item:'Ost i skiver', store:'Bilka', price:25, was:34 },
+  { kw:['yoghurt'], item:'Naturel yoghurt 1 l', store:'Rema 1000', price:10, was:15 },
+  { kw:['banan'], item:'Bananer 1 kg', store:'Rema 1000', price:12, was:17.95 },
+  { kw:['æble'], item:'Æbler 1 kg', store:'Føtex', price:15, was:22 },
+  { kw:['agurk'], item:'Agurk', store:'Netto', price:5, was:9 },
+  { kw:['løg'], item:'Løg 1 kg', store:'Rema 1000', price:8, was:12 },
+  { kw:['kartof'], item:'Kartofler 2 kg', store:'Bilka', price:10, was:17 },
+  { kw:['gulerod'], item:'Gulerødder 1 kg', store:'Netto', price:7, was:12 },
+  { kw:['broccoli'], item:'Broccoli', store:'Rema 1000', price:10, was:15 },
+  { kw:['tomat'], item:'Tomater 500 g', store:'Rema 1000', price:15, was:22 },
+  { kw:['hakket'], item:'Hakket oksekød 500 g', store:'Føtex', price:39, was:54 },
+  { kw:['kylling'], item:'Kyllingebryst 600 g', store:'Netto', price:40, was:55 },
+  { kw:['laks'], item:'Laksfilet 300 g', store:'Føtex', price:30, was:45 },
+  { kw:['pasta','spaghetti'], item:'Pasta 500 g', store:'Rema 1000', price:9, was:14 },
+  { kw:['ris'], item:'Ris 1 kg', store:'Bilka', price:12, was:19 },
+  { kw:['havregryn'], item:'Havregryn 1 kg', store:'Netto', price:10, was:15 },
+  { kw:['kaffe'], item:'Formalet kaffe 400 g', store:'Føtex', price:45, was:62 },
+  { kw:['rugbrød'], item:'Rugbrød', store:'Rema 1000', price:14, was:21 },
+  { kw:['toiletpapir'], item:'Toiletpapir 16 ruller', store:'Bilka', price:49, was:79 },
+  { kw:['køkkenrulle'], item:'Køkkenrulle 4 ruller', store:'Netto', price:20, was:32 },
+  { kw:['opvask'], item:'Opvasketabs 50 stk.', store:'Rema 1000', price:59, was:89 },
+  { kw:['juice'], item:'Appelsinjuice 1 l', store:'Netto', price:13, was:20 },
+  { kw:['ærter'], item:'Frosne ærter 750 g', store:'Føtex', price:12, was:19 }
+];
+const findDeal = name => DEALS.find(d => matchKw(name, d.kw)) || null;
+const NOTE_COLORS = ['note1','note2','note3','note4'];
+const ACTIVITIES = ['Løb','CrossFit','Styrketræning','Fodbold','Kampsport','Svømning','Yoga','Cykling','Andet'];
+const LUNCH_STATES = [
+  { id:'', label:'Ikke sat', cls:'text-muted' },
+  { id:'pack', label:'Madpakke', cls:'text-accent' },
+  { id:'school', label:'Skolemad', cls:'text-goodink' },
+  { id:'special', label:'Særligt', cls:'text-warn' },
+  { id:'off', label:'Fri', cls:'text-muted' }
+];
+/* ---------- startdata (eksempler, relative til i dag) ---------- */
+const STORE_KEY = 'familieplanlaegger.v1';
+const FRESH_MEMBERS = [
+  { id:'far', name:'Far', color:'#4F7CAC', child:false },
+  { id:'mor', name:'Mor', color:'#C0697B', child:false },
+  { id:'b1', name:'Barn 1', color:'#4E9A78', child:true },
+  { id:'b2', name:'Barn 2', color:'#D09A33', child:true }
+];
+function emptyDb() {
+  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], dealsCheckedAt:null,
+    meals:{}, recipes:[], feedMap:{}, feedHidden:{}, sessions:[], goals:[], tasks:[], ledger:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
+}
+function seedDb() {
+  const ws = startOfWeek(new Date());
+  const d = n => iso(addDays(ws, n));
+  const db = emptyDb();
+  db.demo = true;
+  db.events = [
+    { id:uid(), title:'Fodboldtræning', date:d(0), start:'16:30', end:'17:30', member:'b1', note:'Husk drikkedunk' },
+    { id:uid(), title:'Tandlæge', date:d(1), start:'14:15', end:'15:00', member:'b2', note:'' },
+    { id:uid(), title:'Forældremøde', date:d(2), start:'19:00', end:'20:30', member:'far', note:'Skolens aula' },
+    { id:uid(), title:'Mor henter børn', date:d(3), start:'15:30', end:'', member:'mor', note:'' },
+    { id:uid(), title:'Familiehygge og film', date:d(4), start:'18:30', end:'', member:'all', note:'' },
+    { id:uid(), title:'Svømmehal', date:d(5), start:'10:00', end:'11:30', member:'all', note:'' },
+    { id:uid(), title:'Besøg hos bedsteforældre', date:d(6), start:'13:00', end:'16:00', member:'all', note:'Tag kage med' },
+    { id:uid(), title:'Skole-hjem-samtale', date:d(8), start:'15:00', end:'15:30', member:'mor', note:'' },
+    { id:uid(), title:'Bilen til service', date:d(10), start:'08:00', end:'', member:'far', note:'' },
+    { id:uid(), title:'Kamp ude', date:d(12), start:'10:00', end:'12:00', member:'b1', note:'' }
+  ];
+  db.birthdays = [
+    { id:uid(), name:'Barn 1', date:'2016-10-24', kind:'fødselsdag', note:'Ønsker sig LEGO' },
+    { id:uid(), name:'Mormor', date:'1957-11-08', kind:'fødselsdag', note:'Køb blomster' },
+    { id:uid(), name:'Mor', date:'1988-12-02', kind:'fødselsdag', note:'' },
+    { id:uid(), name:'Far', date:'1986-03-15', kind:'fødselsdag', note:'' },
+    { id:uid(), name:'Farfar', date:'1955-02-20', kind:'fødselsdag', note:'' },
+    { id:uid(), name:'Barn 2', date:'2019-06-24', kind:'fødselsdag', note:'' },
+    { id:uid(), name:'Bryllupsdag', date:'2014-06-14', kind:'mærkedag', note:'Book bord' }
+  ];
+  const sh = (name, done) => ({ id:uid(), name, cat:guessCat(name), done:!!done });
+  db.shopping = [sh('Mælk'), sh('Æg'), sh('Bananer'), sh('Agurk'), sh('Rugbrød'), sh('Hakket oksekød'), sh('Kartofler'),
+    sh('Frosne ærter'), sh('Juice'), sh('Kaffe'), sh('Toiletpapir'), sh('Havregryn', true)];
+  const meal = (dish, cook, ing) => ({ dish, cook, ingredients:ing, transferred:false });
+  db.meals = {
+    [d(0)]: meal('Spaghetti bolognese', 'far', ['Hakket oksekød','Spaghetti','Tomater på dåse','Løg','Gulerødder']),
+    [d(1)]: meal('Kylling med ris og grønt', 'mor', ['Kyllingebryst','Ris','Peberfrugt','Broccoli']),
+    [d(2)]: meal('Fiskefrikadeller med kartofler', 'far', ['Fiskefrikadeller','Kartofler','Citron','Remoulade']),
+    [d(3)]: meal('Suppe og hjemmebagt brød', 'mor', ['Gulerødder','Selleri','Bouillon','Mel','Gær']),
+    [d(4)]: meal('Pizza-fredag', 'all', ['Pizzabund','Mozzarella','Tomatpuré','Pepperoni']),
+    [d(5)]: meal('Hjemmelavede burgere', 'far', ['Burgerboller','Hakket oksekød','Salat','Tomater','Cheddar']),
+    [d(6)]: meal('Oksesteg med flødekartofler', 'mor', ['Oksesteg','Kartofler','Fløde','Hvidløg'])
+  };
+  db.recipes = [
+    { id:uid(), name:'Spaghetti bolognese', ingredients:['Hakket oksekød','Spaghetti','Tomater på dåse','Løg','Gulerødder'] },
+    { id:uid(), name:'Kylling med ris og grønt', ingredients:['Kyllingebryst','Ris','Peberfrugt','Broccoli'] },
+    { id:uid(), name:'Pandekager', ingredients:['Mel','Mælk','Æg','Smør'] }
+  ];
+  const ss = (member, activity, day, start, duration, place, driver) => ({ id:uid(), member, activity, day, start, duration, place, driver, note:'' });
+  db.sessions = [
+    ss('b1','Fodbold',0,'16:30',60,'Stadion','far'),
+    ss('far','Løb',1,'06:15',45,'Havnen',''),
+    ss('b2','Kampsport',1,'17:00',60,'Dojoen','mor'),
+    ss('b1','Svømning',1,'17:15',60,'Svømmehallen','mor'),
+    ss('mor','CrossFit',2,'17:00',60,'Boksen',''),
+    ss('b1','Fodbold',3,'16:30',60,'Stadion','mor'),
+    ss('mor','Styrketræning',4,'06:30',60,'Fitness',''),
+    ss('b1','Fodbold',5,'10:00',90,'Kamp ude','far')
+  ];
+  db.goals = [
+    { id:uid(), member:'far', title:'Løb 80 km i oktober', unit:'km', target:80, current:31 },
+    { id:uid(), member:'mor', title:'Bænkpres', unit:'kg', target:60, current:52.5 },
+    { id:uid(), member:'b1', title:'10 fodboldtræninger i oktober', unit:'gange', target:10, current:4 }
+  ];
+  const t = (title, assignee, status, reward, recurring) => ({ id:uid(), title, assignee, status, reward, recurring:!!recurring });
+  db.tasks = [
+    t('Tøm opvasker','b1','todo',5,true), t('Luft hunden','b1','todo',10,true), t('Ryd værelset','b1','todo',10),
+    t('Tag skraldet ud','b2','todo',5,true), t('Dæk bord','b2','done',3,true), t('Fodr kæledyr','b2','doing',3,true),
+    t('Vask tøj','mor','todo',0), t('Støvsug stuen','far','doing',0)
+  ];
+  const doneTask = db.tasks.find(x => x.title === 'Dæk bord');
+  db.ledger = [
+    { id:uid(), member:'b1', amount:15, label:'Ugens pligter', date:d(-3), taskId:null },
+    { id:uid(), member:'b2', amount:20, label:'Ugens pligter', date:d(-3), taskId:null },
+    { id:uid(), member:'b2', amount:doneTask.reward, label:doneTask.title, date:d(0), taskId:doneTask.id }
+  ];
+  db.notes = [
+    { id:uid(), text:'Husk madpakke i morgen!', author:'mor', color:'note1', pinned:true },
+    { id:uid(), text:'Mor henter kl. 15:30', author:'mor', color:'note2', pinned:true },
+    { id:uid(), text:'Gymnastiktøj skal med onsdag', author:'far', color:'note3', pinned:false },
+    { id:uid(), text:'Køb gave til Mormor', author:'far', color:'note4', pinned:false }
+  ];
+  const lunchWeek = [['pack','pack','school','pack','special'], ['pack','school','school','pack','pack']];
+  [ 'b1', 'b2' ].forEach((id, r) => lunchWeek[r].forEach((st, i) => { const k = d(i); db.lunch[k] = { ...(db.lunch[k] || {}), [id]: st }; }));
+  db.rules = [
+    { id:uid(), text:'Gymnastiktøj med', day:2 },
+    { id:uid(), text:'Biblioteksbøger afleveres', day:3 },
+    { id:uid(), text:'Tøm skoletasker for sedler', day:4 },
+    { id:uid(), text:'Sko på hylden og tasker i entreen', day:-1 }
+  ];
+  return db;
+}
+function loadDb() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.v === 1) { const base = emptyDb(); return { ...base, ...p, ui:{ ...base.ui, ...(p.ui || {}) } }; }
+    }
+  } catch (e) {}
+  return seedDb();
+}
+
+/* ---------- kontekst ---------- */
+const Ctx = React.createContext(null);
+const useApp = () => React.useContext(Ctx);
+const memberFor = (db, id) => id === 'all'
+  ? { id:'all', name:'Hele familien', color:'var(--accent)' }
+  : (db.members.find(m => m.id === id) || { id, name:'Ukendt', color:'var(--muted)' });
+const soft = (c, pct = 18) => `color-mix(in srgb, ${c} ${pct}%, var(--surface))`;
+
+/* ---------- fælles komponenter ---------- */
+function Dot({ color, size = 10 }) {
+  return <span className="inline-block rounded-full shrink-0" style={{ width:size, height:size, background:color }} />;
+}
+function Who({ id, small }) {
+  const { db } = useApp(); const m = memberFor(db, id);
+  return <span className="inline-flex items-center gap-1.5 rounded-full font-semibold text-ink whitespace-nowrap"
+    style={{ background:soft(m.color), padding:small ? '1px 8px' : '2px 10px', fontSize:small ? '.72rem' : '.78rem' }}>
+    <Dot color={m.color} size={8} />{m.name}</span>;
+}
+function MemberPick({ value, onChange, all = false, childrenOnly = false, none = '' }) {
+  const { db } = useApp();
+  const opts = [
+    ...(all ? [{ id:'all', name:'Hele familien', color:'var(--accent)' }] : []),
+    ...db.members.filter(m => !childrenOnly || m.child)
+  ];
+  return <div className="flex flex-wrap gap-1.5" role="group">
+    {none && <button type="button" className="chip" aria-pressed={value === ''} onClick={() => onChange('')}>{none}</button>}
+    {opts.map(m => <button type="button" key={m.id} className="chip" aria-pressed={value === m.id} onClick={() => onChange(m.id)}>
+      <Dot color={m.color} size={9} />{m.name}</button>)}
+  </div>;
+}
+function Field({ label, children, className = '' }) {
+  return <label className={'block ' + className}><span className="lbl">{label}</span>{children}</label>;
+}
+function Modal({ title, onClose, children }) {
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, []);
+  return <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="absolute inset-0" style={{ background:'rgba(10,20,22,.5)' }} onClick={onClose} />
+    <div className="pop relative w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto bg-surface border border-line rounded-t-2xl sm:rounded-2xl shadow-2xl"
+      style={{ paddingBottom:'env(safe-area-inset-bottom,0px)' }}>
+      <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5 border-b border-line bg-surface">
+        <h2 className="font-display text-lg font-semibold">{title}</h2>
+        <button type="button" className="iconbtn" onClick={onClose} aria-label="Luk"><Icon name="x" /></button>
+      </div>
+      {children}
+    </div>
+  </div>;
+}
+function FormModal({ title, onClose, onSubmit, onDelete, submitLabel = 'Gem', children }) {
+  return <Modal title={title} onClose={onClose}>
+    <form onSubmit={onSubmit}>
+      <div className="px-5 py-4 flex flex-col gap-4">{children}</div>
+      <div className="px-5 pb-5 flex items-center gap-2">
+        {onDelete && <button type="button" className="btn btn-danger" onClick={onDelete}><Icon name="trash" size={16} />Slet</button>}
+        <span className="flex-1" />
+        <button type="button" className="btn" onClick={onClose}>Annullér</button>
+        <button type="submit" className="btn btn-primary">{submitLabel}</button>
+      </div>
+    </form>
+  </Modal>;
+}
+function PageHead({ icon, title, sub, children }) {
+  return <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-accentsoft text-accent shrink-0"><Icon name={icon} size={20} /></span>
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl font-semibold leading-tight">{title}</h1>
+        {sub && <p className="text-sm text-muted">{sub}</p>}
+      </div>
+    </div>
+    <div className="flex flex-wrap items-center gap-2">{children}</div>
+  </div>;
+}
+function Empty({ icon, text }) {
+  return <div className="flex flex-col items-center gap-2 py-8 text-center text-muted"><Icon name={icon} size={26} /><p className="text-sm max-w-xs">{text}</p></div>;
+}
+function SectionTitle({ children, right }) {
+  return <div className="flex items-center justify-between gap-2 mb-3">
+    <h2 className="font-display text-base font-semibold">{children}</h2>{right}</div>;
+}
+function Check({ done, onClick, label }) {
+  return <button type="button" onClick={onClick} aria-label={label} aria-pressed={done}
+    className="inline-flex items-center justify-center w-6 h-6 rounded-full border-2 shrink-0 transition-colors"
+    style={{ borderColor:done ? 'var(--good)' : 'var(--muted)', background:done ? 'var(--good)' : 'transparent', color:'var(--surface)' }}>
+    {done && <Icon name="check" size={14} sw={3} />}</button>;
+}
+/* ---------- Overblik ---------- */
+function Overblik() {
+  const { db, go, eventsFor } = useApp();
+  const now = new Date(); const today = iso(now); const di = dayIdx(now);
+  const evs = eventsFor(today).sort(byTime);
+  const trains = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
+  const meal = db.meals[today];
+  const nextBd = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(now)) })).sort((a, b) => a.days - b.days)[0];
+  const open = db.tasks.filter(t => t.status !== 'done');
+  const left = db.shopping.filter(i => !i.done).length;
+  const pinned = db.notes.filter(n => n.pinned).slice(0, 3);
+  const rulesToday = db.rules.filter(r => r.day === -1 || r.day === di);
+  const hour = now.getHours();
+  const greet = hour < 10 ? 'God morgen' : hour < 17 ? 'God dag' : 'God aften';
+  const Card = ({ title, tab, children }) => <section className="card p-4 flex flex-col gap-3 min-w-0">
+    <div className="flex items-center justify-between"><h2 className="font-display font-semibold">{title}</h2>
+      <button className="btn btn-ghost btn-sm" onClick={() => go(tab)}>Åbn<Icon name="right" size={14} /></button></div>{children}</section>;
+  return <div>
+    <div className="mb-6">
+      <p className="text-sm text-muted tnum">{fmtLong(now)} · uge {isoWeek(now)}</p>
+      <h1 className="font-display text-3xl font-semibold">{greet}, familie</h1>
+    </div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <Card title="I dag" tab="kalender">
+        {evs.length === 0 && trains.length === 0 && <p className="text-sm text-muted">Ingen aftaler i dag.</p>}
+        {evs.map(e => <div key={e.id} className="flex items-center gap-2 text-sm">
+          <span className="w-12 tnum text-muted shrink-0">{e.start || 'Hele dagen'}</span><span className="truncate flex-1">{e.title}</span><Who id={e.member} small /></div>)}
+        {trains.map(s => <div key={s.id} className="flex items-center gap-2 text-sm text-muted">
+          <span className="w-12 tnum shrink-0">{s.start}</span><Icon name="dumbbell" size={14} /><span className="truncate flex-1">{s.activity}</span><Who id={s.member} small /></div>)}
+      </Card>
+      <Card title="Aftensmad" tab="madplan">
+        {meal && meal.dish ? <>
+          <p className="font-display text-xl font-semibold leading-snug">{meal.dish}</p>
+          <p className="text-sm text-muted flex items-center gap-2">Kokketjans {meal.cook ? <Who id={meal.cook} small /> : <span>ikke fordelt</span>}</p>
+        </> : <p className="text-sm text-muted">Ingen ret planlagt i dag.</p>}
+      </Card>
+      <Card title="Næste mærkedag" tab="foedselsdage">
+        {nextBd ? <>
+          <p className="font-display text-xl font-semibold leading-snug">{nextBd.b.name}</p>
+          <p className="text-sm text-muted">{nextBd.days === 0 ? 'I dag!' : `Om ${nextBd.days} ${nextBd.days === 1 ? 'dag' : 'dage'}`} · {nextBd.b.kind === 'mærkedag' ? `${nextBd.turning} år` : `fylder ${nextBd.turning}`}</p>
+        </> : <p className="text-sm text-muted">Ingen datoer endnu.</p>}
+      </Card>
+      <Card title="Pligter" tab="pligter">
+        <p className="text-sm"><span className="font-display text-2xl font-semibold tnum">{open.length}</span> <span className="text-muted">åbne opgaver</span></p>
+        <div className="flex flex-wrap gap-1.5">{db.members.map(m => { const n = open.filter(t => t.assignee === m.id).length; return n ? <span key={m.id} className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-0.5" style={{ background:soft(m.color) }}><Dot color={m.color} size={8} />{m.name} {n}</span> : null; })}</div>
+      </Card>
+      <Card title="Indkøb" tab="indkoeb">
+        <p className="text-sm"><span className="font-display text-2xl font-semibold tnum">{left}</span> <span className="text-muted">varer tilbage på listen</span></p>
+      </Card>
+      <Card title="Køleskabsdøren" tab="koeleskab">
+        {rulesToday.map(r => <p key={r.id} className="text-sm flex items-center gap-2"><Icon name="bell" size={14} className="text-warn" />{r.text}</p>)}
+        {pinned.map(n => <p key={n.id} className="text-sm rounded-lg px-3 py-2" style={{ background:`var(--${n.color})` }}>{n.text}</p>)}
+        {!pinned.length && !rulesToday.length && <p className="text-sm text-muted">Ingen opslåede beskeder.</p>}
+      </Card>
+    </div>
+  </div>;
+}
+
+/* ---------- Kalender ---------- */
+function EventModal({ init, onClose }) {
+  const { set } = useApp();
+  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const submit = e => {
+    e.preventDefault(); if (!f.title.trim()) return;
+    const ev = { ...f, title:f.title.trim() };
+    if (ev.id) set('events', l => l.map(x => x.id === ev.id ? ev : x)); else set('events', l => [...l, { ...ev, id:uid() }]);
+    onClose();
+  };
+  const del = () => { set('events', l => l.filter(x => x.id !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér aftale' : 'Ny aftale'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <Field label="Titel"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx tandlæge" /></Field>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <Field label="Dato"><input type="date" className="field" value={f.date} onChange={e => u('date', e.target.value)} required /></Field>
+      <Field label="Fra"><input type="time" className="field" value={f.start} onChange={e => u('start', e.target.value)} /></Field>
+      <Field label="Til"><input type="time" className="field" value={f.end} onChange={e => u('end', e.target.value)} /></Field>
+    </div>
+    <div><span className="lbl">Hvem</span><MemberPick all value={f.member} onChange={v => u('member', v)} /></div>
+    <Field label="Note"><textarea className="field" rows={2} value={f.note} onChange={e => u('note', e.target.value)} /></Field>
+  </FormModal>;
+}
+
+function Kalender() {
+  const { db, set, eventsFor, ext } = useApp();
+  const ui = db.ui; const setUi = p => set('ui', u => ({ ...u, ...p }));
+  const [cursor, setCursor] = useState(() => startOfDay(new Date()));
+  const [sel, setSel] = useState(() => iso(startOfDay(new Date())));
+  const [modal, setModal] = useState(null); const [extEv, setExtEv] = useState(null); const [sync, setSync] = useState(false);
+  const today = iso(new Date()); const filter = ui.calFilter; const view = ui.calView;
+  const vis = e => filter === 'all' || e.member === filter || e.member === 'all';
+  const eventsOn = k => eventsFor(k).filter(vis).sort(byTime);
+  const trainOn = k => ui.showTraining ? db.sessions.filter(s => s.day === dayIdx(parse(k)) && (filter === 'all' || s.member === filter)).sort((a, b) => a.start.localeCompare(b.start)) : [];
+  const newEv = date => setModal({ title:'', date, start:'', end:'', member:filter === 'all' ? 'all' : filter, note:'' });
+  const shift = n => setCursor(c => view === 'month' ? new Date(c.getFullYear(), c.getMonth() + n, 1) : addDays(c, 7 * n));
+  const soon = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(new Date())) })).filter(x => x.days <= 7).sort((a, b) => a.days - b.days);
+
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const dim = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const gridStart = startOfWeek(first);
+  const cells = Array.from({ length:Math.ceil((dayIdx(first) + dim) / 7) * 7 }, (_, i) => addDays(gridStart, i));
+  const ws = startOfWeek(cursor); const wdays = Array.from({ length:7 }, (_, i) => addDays(ws, i));
+  const title = view === 'month' ? `${MONTHS[cursor.getMonth()][0].toUpperCase() + MONTHS[cursor.getMonth()].slice(1)} ${cursor.getFullYear()}`
+    : `Uge ${isoWeek(ws)} · ${fmtShort(ws)} til ${fmtShort(addDays(ws, 6))}`;
+
+  const EventRow = ({ e }) => <button className="w-full text-left flex items-center gap-2 rounded-lg px-2.5 py-2 hover:brightness-95" style={{ background:soft(memberFor(db, e.member).color) }} onClick={() => e.ext ? setExtEv(e) : setModal(e)}>
+    <span className="tnum text-xs text-muted w-[84px] shrink-0">{e.start ? e.start + (e.end ? '–' + e.end : '') : 'Hele dagen'}</span>
+    <span className="font-semibold text-sm truncate flex-1">{e.title}</span>{e.ext && <Icon name="cloud" size={13} className="text-muted" />}<Dot color={memberFor(db, e.member).color} /></button>;
+  const TrainRow = ({ s }) => <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 border border-dashed border-line text-sm text-muted">
+    <span className="tnum text-xs w-[84px] shrink-0">{s.start}–{fromMin(toMin(s.start) + s.duration)}</span>
+    <Icon name="dumbbell" size={14} /><span className="truncate flex-1">{s.activity}, {memberFor(db, s.member).name}</span></div>;
+  const BdRow = ({ b }) => <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-warnsoft text-sm font-semibold text-ink">
+    <Icon name="cake" size={16} className="text-warn" />{b.name}{b.kind === 'mærkedag' ? ` · ${new Date().getFullYear() - parse(b.date).getFullYear()} år` : ''}</div>;
+
+  const selDate = parse(sel); const selEvents = eventsOn(sel); const selTrain = trainOn(sel); const selBd = birthdaysOn(db.birthdays, selDate); const selMeal = db.meals[sel];
+
+  return <div>
+    <PageHead icon="calendar" title="Fælles kalender" sub="Alles aftaler samlet ét sted">
+      <button className="btn" onClick={() => setSync(true)}><Icon name="refresh" size={16} className={ext.status === 'loading' ? 'animate-spin' : ''} />Synk</button>
+      <button className="btn btn-primary" onClick={() => newEv(sel)}><Icon name="plus" size={16} />Ny aftale</button>
+    </PageHead>
+    {soon.length > 0 && <div className="flex items-start gap-3 rounded-xl bg-warnsoft px-4 py-3 mb-4 text-sm">
+      <Icon name="bell" className="text-warn mt-0.5" /><div className="min-w-0">
+        <p className="font-semibold">Påmindelse</p>
+        <p className="text-muted">{soon.map(x => `${x.b.name} ${x.days === 0 ? 'i dag' : x.days === 1 ? 'i morgen' : `om ${x.days} dage`}`).join(' · ')}</p></div></div>}
+    <div className="flex flex-wrap items-center gap-2 mb-3">
+      <button className="chip" aria-pressed={filter === 'all'} onClick={() => setUi({ calFilter:'all' })}><Icon name="users" size={14} />Hele familien</button>
+      {db.members.map(m => <button key={m.id} className="chip" aria-pressed={filter === m.id} onClick={() => setUi({ calFilter:m.id })}><Dot color={m.color} size={9} />{m.name}</button>)}
+      <button className="chip" aria-pressed={!!ui.showTraining} onClick={() => setUi({ showTraining:!ui.showTraining })}><Icon name="dumbbell" size={14} />Træning</button>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div className="flex items-center gap-1">
+        <button className="iconbtn" aria-label="Forrige" onClick={() => shift(-1)}><Icon name="left" /></button>
+        <h2 className="font-display text-lg font-semibold tnum min-w-0 px-1">{title}</h2>
+        <button className="iconbtn" aria-label="Næste" onClick={() => shift(1)}><Icon name="right" /></button>
+      </div>
+      <div className="flex items-center gap-2">
+        <button className="btn btn-sm" onClick={() => { setCursor(startOfDay(new Date())); setSel(today); }}>I dag</button>
+        <div className="seg"><button aria-pressed={view === 'month'} onClick={() => setUi({ calView:'month' })}>Måned</button><button aria-pressed={view === 'week'} onClick={() => setUi({ calView:'week' })}>Uge</button></div>
+      </div>
+    </div>
+    <div className="grid gap-4 lg:grid-cols-[1fr_320px] items-start">
+      <div className="min-w-0">
+        {view === 'month' ? <div className="card overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-line">{DS.map(x => <div key={x} className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted py-2">{x}</div>)}</div>
+          <div className="grid grid-cols-7">
+            {cells.map((d, i) => {
+              const k = iso(d); const evs = eventsOn(k); const bd = birthdaysOn(db.birthdays, d); const inM = d.getMonth() === cursor.getMonth();
+              return <button key={k} onClick={() => setSel(k)} aria-label={fmtLong(d)}
+                className={`text-left p-1 sm:p-1.5 min-h-[58px] sm:min-h-[104px] min-w-0 flex flex-col gap-1 border-line ${i % 7 ? 'border-l' : ''} ${i >= 7 ? 'border-t' : ''} ${inM ? '' : 'opacity-45'} ${k === sel ? 'bg-accentsoft' : 'bg-surface hover:bg-surface2'}`}>
+                <span className="flex items-center justify-between w-full">
+                  <span className={`tnum text-xs sm:text-sm font-semibold w-6 h-6 inline-flex items-center justify-center rounded-full ${k === today ? 'bg-accent text-accentink' : ''}`}>{d.getDate()}</span>
+                  {bd.length > 0 && <Icon name="cake" size={14} className="text-warn" />}
+                </span>
+                <span className="hidden sm:flex flex-col gap-0.5 min-w-0 w-full">
+                  {evs.slice(0, 2).map(e => <span key={e.id} className="truncate rounded px-1.5 py-0.5 text-[11px] font-medium text-ink" style={{ background:soft(memberFor(db, e.member).color, 24) }}>{e.start && <span className="tnum">{e.start} </span>}{e.title}</span>)}
+                  {evs.length > 2 && <span className="text-[11px] text-muted px-1">+{evs.length - 2} mere</span>}
+                </span>
+                <span className="sm:hidden flex flex-wrap gap-0.5">{evs.slice(0, 4).map(e => <Dot key={e.id} color={memberFor(db, e.member).color} size={6} />)}</span>
+              </button>;
+            })}
+          </div>
+        </div> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {wdays.map(d => { const k = iso(d); const evs = eventsOn(k); const tr = trainOn(k); const bd = birthdaysOn(db.birthdays, d);
+            return <section key={k} className={`card p-3 flex flex-col gap-1.5 min-w-0 ${k === today ? 'ring-2 ring-accent' : ''}`}>
+              <button className="flex items-baseline justify-between text-left" onClick={() => setSel(k)}>
+                <span className="font-display font-semibold">{DAYS[dayIdx(d)]}</span><span className="tnum text-sm text-muted">{fmtShort(d)}</span></button>
+              {bd.map(b => <BdRow key={b.id} b={b} />)}
+              {evs.map(e => <EventRow key={e.id} e={e} />)}
+              {tr.map(s => <TrainRow key={s.id} s={s} />)}
+              {!bd.length && !evs.length && !tr.length && <p className="text-sm text-muted py-1">Ingen aftaler</p>}
+              <button className="btn btn-ghost btn-sm self-start text-muted" onClick={() => newEv(k)}><Icon name="plus" size={14} />Tilføj</button>
+            </section>; })}
+        </div>}
+      </div>
+      <aside className="card p-4 flex flex-col gap-2 min-w-0 lg:sticky lg:top-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display font-semibold">{fmtLong(selDate)}</h2>
+          <button className="btn btn-sm" onClick={() => newEv(sel)}><Icon name="plus" size={14} />Ny</button></div>
+        {selBd.map(b => <BdRow key={b.id} b={b} />)}
+        {selEvents.map(e => <EventRow key={e.id} e={e} />)}
+        {selTrain.map(s => <TrainRow key={s.id} s={s} />)}
+        {selMeal && selMeal.dish && <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 bg-surface2 text-sm"><Icon name="utensils" size={14} className="text-muted" /><span className="truncate flex-1">{selMeal.dish}</span>{selMeal.cook && <Who id={selMeal.cook} small />}</div>}
+        {!selEvents.length && !selTrain.length && !selBd.length && !(selMeal && selMeal.dish) && <Empty icon="calendar" text="Intet planlagt denne dag." />}
+      </aside>
+    </div>
+    {modal && <EventModal init={modal} onClose={() => setModal(null)} />}
+    {extEv && <ExtEventModal e={extEv} onClose={() => setExtEv(null)} />}
+    {sync && <SyncModal onClose={() => setSync(false)} />}
+  </div>;
+}
+/* ---------- Eksterne kalendere (read-only) ---------- */
+const EXT_KEY = 'familieplanlaegger.ext.v1';
+
+function ExtEventModal({ e, onClose }) {
+  const when = e.allDay || !e.start ? 'Hele dagen' : e.start + (e.end ? ' til ' + e.end : '');
+  return <Modal title={e.title} onClose={onClose}>
+    <div className="px-5 py-4 flex flex-col gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2"><Who id={e.member} /><span className="inline-flex items-center gap-1.5 text-muted"><Icon name="cloud" size={14} />{e.feedName}</span></div>
+      <p className="tnum"><b className="font-semibold">{fmtLong(parse(e.date))}</b>, {when}</p>
+      {e.location && <p className="flex items-center gap-2 text-muted"><Icon name="pinmap" size={15} />{e.location}</p>}
+      {e.note && <p className="whitespace-pre-wrap text-muted">{e.note}</p>}
+      <p className="text-xs text-muted rounded-lg bg-surface2 px-3 py-2">Denne aftale kommer fra en ekstern kalender. Ret den i kilden, så opdateres den her ved næste synkronisering.</p>
+      <button type="button" className="btn btn-primary self-end" onClick={onClose}>Luk</button>
+    </div>
+  </Modal>;
+}
+
+function SyncModal({ onClose }) {
+  const { db, set, ext, refreshExt } = useApp();
+  const feeds = (ext.data && ext.data.feeds) || [];
+  const gen = ext.data && ext.data.generated ? new Date(ext.data.generated) : null;
+  const when = d => d.toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const map = db.feedMap || {}; const hidden = db.feedHidden || {};
+  return <Modal title="Kalendersynkronisering" onClose={onClose}>
+    <div className="px-5 py-4 flex flex-col gap-4">
+      {feeds.length === 0 ? <div className="flex flex-col gap-2 text-sm">
+        <p className="font-semibold">Ingen eksterne kalendere endnu</p>
+        <p className="text-muted">{ext.status === 'loading' ? 'Henter data ...' : 'Synkroniseringen kører som en GitHub Action og lægger kalenderdata ved siden af appen. Følg README for at sætte den op. Når den har kørt første gang, dukker dine kalendere op her.'}</p>
+      </div> : <>
+        <p className="text-sm text-muted">Vælg hvem hver kalender hører til. Aftalerne får personens farve og følger kalenderens filter.</p>
+        {feeds.map(f => <section key={f.id} className="rounded-xl border border-line p-3 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold min-w-0 truncate">{f.name}</p>
+            <span className="text-xs text-muted tnum shrink-0">{f.count} {f.count === 1 ? 'aftale' : 'aftaler'}</span></div>
+          {f.error && <p className="text-xs rounded-lg bg-warnsoft text-warn px-2.5 py-1.5">{f.error}</p>}
+          <div><span className="lbl">Tilhører</span><MemberPick all value={map[f.id] || f.member || 'all'} onChange={v => set('feedMap', m => ({ ...(m || {}), [f.id]:v }))} /></div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!hidden[f.id]} onChange={e => set('feedHidden', h => ({ ...(h || {}), [f.id]:!e.target.checked }))} />Vis i kalenderen</label>
+        </section>)}
+      </>}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+        <span className="tnum">{gen ? `Kilderne blev sidst hentet ${when(gen)}` : 'Ikke hentet endnu'}</span>
+        <button type="button" className="btn btn-sm" onClick={refreshExt} disabled={ext.status === 'loading'}><Icon name="refresh" size={14} className={ext.status === 'loading' ? 'animate-spin' : ''} />Opdatér nu</button>
+      </div>
+      <p className="text-xs text-muted">Appen henter nye data hvert 10. minut og når du vender tilbage til fanen. Selve kalenderne hentes af GitHub Action'en, som standard hver halve time.</p>
+    </div>
+  </Modal>;
+}
+/* ---------- Deling med familien (Firebase) ---------- */
+const FAM_KEY = 'familieplanlaegger.family.v1';
+const SYNC_SKIP = ['ui', 'v'];
+const cleanCode = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function newFamilyCode() {
+  const alpha = 'abcdefghijkmnpqrstuvwxyz23456789'; // 32 tegn
+  const b = new Uint8Array(24); crypto.getRandomValues(b);
+  return Array.from(b, x => alpha[x % alpha.length]).join('');
+}
+function explainFbError(e) {
+  const c = (e && (e.code || '')) + '';
+  if (c.includes('permission-denied')) return 'Firestore afviser adgang. Tjek at sikkerhedsreglerne er udgivet (se guiden, trin 4).';
+  if (c.includes('operation-not-allowed') || c.includes('admin-restricted')) return 'Anonym login er ikke slået til i Firebase (Authentication, Sign-in method, Anonymous).';
+  if (c.includes('unavailable') || c.includes('network')) return 'Ingen forbindelse til Firebase lige nu. Ændringer gemmes og sendes, når forbindelsen er tilbage.';
+  if (c.includes('invalid-api-key') || c.includes('api-key-not-valid')) return 'Firebase-nøglen i data/firebase-config.json er ugyldig.';
+  return (e && e.message) || 'Ukendt fejl';
+}
+
+function useFamilySync(db, setDb) {
+  const [cfg, setCfg] = useState(undefined); // undefined = indlæser, null = ikke sat op
+  const [code, setCode] = useState(() => { try { return localStorage.getItem(FAM_KEY) || ''; } catch (e) { return ''; } });
+  const [state, setState] = useState({ status:'idle', error:'', at:null });
+  const last = useRef({}); const ready = useRef(false); const refRef = useRef(null); const timer = useRef(null);
+  const dbRef = useRef(db); dbRef.current = db;
+
+  // invitationslink: #familie=KODE
+  useEffect(() => {
+    const m = (location.hash || '').match(/familie=([A-Za-z0-9]+)/);
+    if (m) {
+      const c = cleanCode(m[1]);
+      if (c.length >= 20) { try { localStorage.setItem(FAM_KEY, c); } catch (e) {} setCode(c); }
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    }
+  }, []);
+  // Firebase-opsætning
+  useEffect(() => {
+    fetch('data/firebase-config.json?t=' + Date.now(), { cache:'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => setCfg(j && j.apiKey && j.projectId ? j : null))
+      .catch(() => setCfg(null));
+  }, []);
+
+  const push = () => {
+    const ref = refRef.current; if (!ref || !ready.current) return;
+    const d = dbRef.current; const upd = {};
+    for (const k of Object.keys(d)) { if (SYNC_SKIP.includes(k)) continue; const s = JSON.stringify(d[k]); if (last.current[k] !== s) upd[k] = s; }
+    if (!Object.keys(upd).length) return;
+    Object.assign(last.current, upd);
+    ref.set({ ...upd, _updatedAt:window.firebase.firestore.FieldValue.serverTimestamp() }, { merge:true }).catch(e => {
+      Object.keys(upd).forEach(k => { delete last.current[k]; });
+      setState(s => ({ ...s, status:'error', error:explainFbError(e) }));
+    });
+  };
+
+  useEffect(() => {
+    if (cfg === undefined) return;
+    if (cfg === null) { setState({ status:'nocfg', error:'', at:null }); return; }
+    if (!window.firebase) { setState({ status:'error', error:'Firebase kunne ikke indlæses. Tjek din internetforbindelse.', at:null }); return; }
+    if (!code) { setState({ status:'local', error:'', at:null }); return; }
+    let dead = false; let unsub = () => {};
+    ready.current = false; last.current = {}; refRef.current = null;
+    setState({ status:'connecting', error:'', at:null });
+    (async () => {
+      try {
+        const fb = window.firebase;
+        if (!fb.apps.length) {
+          fb.initializeApp(cfg);
+          try { fb.firestore().enablePersistence({ synchronizeTabs:true }).catch(() => {}); } catch (e) {}
+        }
+        await fb.auth().signInAnonymously();
+        if (dead) return;
+        const ref = fb.firestore().collection('families').doc(code); refRef.current = ref;
+        unsub = ref.onSnapshot(snap => {
+          if (dead || snap.metadata.hasPendingWrites) return;
+          const data = snap.exists ? snap.data() : null;
+          if (data) {
+            const patch = {};
+            for (const k of Object.keys(data)) {
+              if (k.startsWith('_') || SYNC_SKIP.includes(k) || typeof data[k] !== 'string') continue;
+              const s = data[k]; if (last.current[k] === s) continue;
+              const localStr = JSON.stringify(dbRef.current[k]);
+              if (last.current[k] !== undefined && localStr !== last.current[k]) continue; // lokal ændring er på vej op
+              try { patch[k] = JSON.parse(s); last.current[k] = s; } catch (e) {}
+            }
+            if (Object.keys(patch).length) setDb(d => ({ ...d, ...patch }));
+          }
+          ready.current = true;
+          setState({ status:'on', error:'', at:new Date(), cached:snap.metadata.fromCache });
+          clearTimeout(timer.current); timer.current = setTimeout(push, 300);
+        }, err => setState({ status:'error', error:explainFbError(err), at:null }));
+      } catch (e) { if (!dead) setState({ status:'error', error:explainFbError(e), at:null }); }
+    })();
+    return () => { dead = true; unsub(); ready.current = false; clearTimeout(timer.current); };
+  }, [cfg, code]);
+
+  useEffect(() => {
+    if (state.status !== 'on') return;
+    clearTimeout(timer.current); timer.current = setTimeout(push, 400);
+    return () => clearTimeout(timer.current);
+  }, [db, state.status]);
+
+  const join = c => { const cc = cleanCode(c); if (cc.length < 20) return false; try { localStorage.setItem(FAM_KEY, cc); } catch (e) {} setCode(cc); return true; };
+  const create = () => { const c = newFamilyCode(); join(c); return c; };
+  const leave = () => { try { localStorage.removeItem(FAM_KEY); } catch (e) {} setCode(''); };
+  return { cfg, code, status:state.status, error:state.error, at:state.at, cached:state.cached, join, create, leave };
+}
+
+function ShareModal({ onClose }) {
+  const { fsync, notify } = useApp();
+  const [input, setInput] = useState(''); const [confirmJoin, setConfirmJoin] = useState(false); const [confirmLeave, setConfirmLeave] = useState(false);
+  const [show, setShow] = useState(false);
+  const link = location.origin + location.pathname + '#familie=' + fsync.code;
+  const copy = async (text, msg) => {
+    try { await navigator.clipboard.writeText(text); notify(msg); } catch (e) { notify('Markér teksten og kopiér den manuelt'); }
+  };
+  const st = fsync.status;
+  const Box = ({ tone, children }) => <div className={`rounded-xl px-3.5 py-3 text-sm ${tone === 'bad' ? 'bg-dangersoft text-ink' : tone === 'good' ? 'bg-goodsoft text-goodink' : 'bg-surface2 text-ink'}`}>{children}</div>;
+  return <Modal title="Deling med familien" onClose={onClose}>
+    <div className="px-5 py-4 flex flex-col gap-4 text-sm">
+      {st === 'nocfg' && <Box>
+        <p className="font-semibold">Deling er ikke sat op endnu</p>
+        <p className="text-muted mt-1">Det kræver et gratis Firebase-projekt. Følg filen <b>FIREBASE-GUIDE.md</b> i projektet, og udfyld <b>data/firebase-config.json</b>. Det tager cirka ti minutter, og så kan hele familien dele data.</p></Box>}
+      {st === 'idle' && <p className="text-muted">Henter opsætning ...</p>}
+      {st === 'error' && <Box tone="bad"><p className="font-semibold">Der er et problem</p><p className="mt-1">{fsync.error}</p></Box>}
+      {(st === 'local' || (st === 'error' && !fsync.code)) && fsync.cfg && <>
+        <p className="text-muted">Nu gemmes alt kun på denne enhed. Opret en fælles familie, så ser alle de samme indkøb, pligter, madplaner og beskeder, og ændringer dukker op hos de andre med det samme.</p>
+        <button className="btn btn-primary self-start" onClick={() => { fsync.create(); notify('Familien er oprettet. Del linket med de andre.'); }}><Icon name="users" size={16} />Opret fælles familie</button>
+        <div className="border-t border-line pt-4 flex flex-col gap-2">
+          <label><span className="lbl">Har du allerede en familiekode?</span>
+            <input id="fam-code" className="field" value={input} onChange={e => { setInput(e.target.value); setConfirmJoin(false); }} placeholder="Indsæt koden her" autoComplete="off" /></label>
+          {confirmJoin ? <Box tone="bad"><p>Data på denne enhed bliver erstattet af familiens data. Vil du fortsætte?</p>
+            <div className="flex gap-2 mt-2"><button className="btn btn-sm btn-primary" onClick={() => { if (fsync.join(input)) { notify('Du er koblet til familien'); onClose(); } else notify('Koden er for kort'); }}>Ja, tilslut</button><button className="btn btn-sm" onClick={() => setConfirmJoin(false)}>Annullér</button></div></Box>
+            : <button className="btn self-start" disabled={cleanCode(input).length < 20} onClick={() => setConfirmJoin(true)}>Tilslut familie</button>}
+        </div></>}
+      {fsync.code && fsync.cfg && <>
+        <Box tone={st === 'on' ? 'good' : undefined}>
+          <p className="font-semibold flex items-center gap-2"><Icon name={st === 'on' ? 'check' : 'refresh'} size={15} className={st === 'connecting' ? 'animate-spin' : ''} />{st === 'on' ? 'Delt med familien' : st === 'connecting' ? 'Forbinder ...' : 'Ikke forbundet'}</p>
+          {st === 'on' && <p className="mt-0.5 opacity-90 tnum">{fsync.cached ? 'Viser gemte data, mens der ikke er forbindelse.' : `Sidst opdateret ${fsync.at ? fsync.at.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : ''}`}</p>}
+        </Box>
+        <div className="flex flex-col gap-1.5">
+          <span className="lbl">Invitationslink til resten af familien</span>
+          <div className="flex gap-2"><input className="field" readOnly value={link} onFocus={e => e.target.select()} aria-label="Invitationslink" />
+            <button className="btn shrink-0" onClick={() => copy(link, 'Linket er kopieret')}><Icon name="copy" size={15} />Kopiér</button></div>
+          <p className="text-xs text-muted">Åbner man linket, bliver man koblet til familien. Send det kun til dem, der skal have adgang. Alle med linket kan se og rette alt.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="lbl">Familiekode</span>
+          <div className="flex gap-2"><input className="field font-mono" readOnly type={show ? 'text' : 'password'} value={fsync.code} aria-label="Familiekode" />
+            <button className="btn shrink-0" onClick={() => setShow(s => !s)}>{show ? 'Skjul' : 'Vis'}</button></div>
+        </div>
+        <div className="border-t border-line pt-4">
+          {confirmLeave ? <Box tone="bad"><p>Denne enhed holder op med at dele. Dine data bliver liggende her, men ændringer deles ikke længere.</p>
+            <div className="flex gap-2 mt-2"><button className="btn btn-sm btn-danger" onClick={() => { fsync.leave(); onClose(); }}>Forlad familien</button><button className="btn btn-sm" onClick={() => setConfirmLeave(false)}>Annullér</button></div></Box>
+            : <button className="btn btn-sm btn-danger" onClick={() => setConfirmLeave(true)}>Forlad familien på denne enhed</button>}
+        </div></>}
+      <button className="btn self-end" onClick={onClose}>Luk</button>
+    </div>
+  </Modal>;
+}
+/* ---------- Fødselsdage ---------- */
+function BirthdayModal({ init, onClose }) {
+  const { set } = useApp();
+  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const submit = e => {
+    e.preventDefault(); if (!f.name.trim() || !f.date) return;
+    const b = { ...f, name:f.name.trim() };
+    if (b.id) set('birthdays', l => l.map(x => x.id === b.id ? b : x)); else set('birthdays', l => [...l, { ...b, id:uid() }]);
+    onClose();
+  };
+  const del = () => { set('birthdays', l => l.filter(x => x.id !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér dato' : 'Ny dato'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <Field label="Navn"><input className="field" autoFocus value={f.name} onChange={e => u('name', e.target.value)} placeholder="Fx Mormor" /></Field>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Field label={f.kind === 'mærkedag' ? 'Startdato (første gang)' : 'Fødselsdato'}><input type="date" className="field" value={f.date} onChange={e => u('date', e.target.value)} required /></Field>
+      <Field label="Type"><select className="field" value={f.kind} onChange={e => u('kind', e.target.value)}><option value="fødselsdag">Fødselsdag</option><option value="mærkedag">Mærkedag (bryllup, jubilæum)</option></select></Field>
+    </div>
+    <Field label="Gaveidé eller note"><input className="field" value={f.note} onChange={e => u('note', e.target.value)} /></Field>
+  </FormModal>;
+}
+function Foedselsdage() {
+  const { db } = useApp();
+  const [modal, setModal] = useState(null);
+  const t0 = startOfDay(new Date());
+  const list = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0) })).sort((a, b) => a.days - b.days);
+  const hero = list[0]; const rest = list.slice(1);
+  const label = x => x.b.kind === 'mærkedag' ? `${x.turning} år` : `fylder ${x.turning}`;
+  return <div>
+    <PageHead icon="cake" title="Fødselsdage og mærkedage" sub="Nedtælling og alder, så ingen glemmes">
+      <button className="btn btn-primary" onClick={() => setModal({ name:'', date:'', kind:'fødselsdag', note:'' })}><Icon name="plus" size={16} />Tilføj dato</button>
+    </PageHead>
+    {!hero && <div className="card"><Empty icon="cake" text="Ingen datoer endnu. Tilføj den første fødselsdag." /></div>}
+    {hero && <div className="card p-5 sm:p-6 mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 justify-between">
+      <div className="min-w-0">
+        <p className="lbl">Næste</p>
+        <h2 className="font-display text-3xl font-semibold leading-tight">{hero.b.name}</h2>
+        <p className="text-muted mt-1">{hero.b.kind === 'mærkedag' ? `Fejrer ${hero.turning} år` : `Fylder ${hero.turning} år`}, {fmtLong(hero.date).toLowerCase()}</p>
+        {hero.b.note && <p className="mt-2 text-sm inline-flex items-center gap-1.5 rounded-full bg-warnsoft px-3 py-1"><Icon name="gift" size={14} className="text-warn" />{hero.b.note}</p>}
+      </div>
+      <div className="text-right">
+        {hero.days === 0 ? <p className="font-display text-4xl font-semibold text-accent">I dag!</p> : <>
+          <p className="font-display text-6xl font-semibold text-accent tnum leading-none">{hero.days}</p>
+          <p className="text-muted mt-1">{hero.days === 1 ? 'dag til' : 'dage til'}</p></>}
+      </div>
+    </div>}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {rest.map(x => <button key={x.b.id} onClick={() => setModal(x.b)} className="card p-4 text-left flex items-center gap-3 hover:bg-surface2 min-w-0">
+        <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-accentsoft text-accent shrink-0"><Icon name={x.b.kind === 'mærkedag' ? 'gift' : 'cake'} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold truncate">{x.b.name}</span>
+          <span className="block text-sm text-muted truncate">{label(x)}{x.b.kind === 'fødselsdag' ? ` · nu ${x.age} år` : ''} · {fmtShort(x.date)}</span>
+        </span>
+        <span className="text-right shrink-0"><span className="block font-display text-xl font-semibold tnum">{x.days}</span><span className="block text-[11px] text-muted">{x.days === 1 ? 'dag' : 'dage'}</span></span>
+      </button>)}
+    </div>
+    {hero && <p className="text-sm text-muted mt-4 flex items-center gap-2"><Icon name="bell" size={14} />Datoerne vises automatisk i kalenderen, med en påmindelse 7 dage før.</p>}
+    {modal && <BirthdayModal init={modal} onClose={() => setModal(null)} />}
+  </div>;
+}
+
+/* ---------- Indkøb ---------- */
+function Indkoeb() {
+  const { db, set, notify } = useApp();
+  const [name, setName] = useState(''); const [cat, setCat] = useState('auto');
+  const [step, setStep] = useState(-1); const [copyBox, setCopyBox] = useState(null);
+  const timer = useRef(null);
+  useEffect(() => () => clearInterval(timer.current), []);
+  const items = db.shopping; const checked = !!db.dealsCheckedAt;
+  const left = items.filter(i => !i.done);
+  const add = (n, c) => {
+    const nm = n.trim(); if (!nm) return;
+    if (items.some(i => !i.done && i.name.toLowerCase() === nm.toLowerCase())) { notify(`${nm} står allerede på listen`); return; }
+    set('shopping', l => [...l, { id:uid(), name:nm, cat:c && c !== 'auto' ? c : guessCat(nm), done:false }]);
+  };
+  const submit = e => { e.preventDefault(); add(name, cat); setName(''); };
+  const toggle = id => set('shopping', l => l.map(i => i.id === id ? { ...i, done:!i.done } : i));
+  const remove = id => set('shopping', l => l.filter(i => i.id !== id));
+  const runCheck = () => {
+    if (checked) { set('dealsCheckedAt', null); return; }
+    let i = 0; setStep(0);
+    timer.current = setInterval(() => {
+      i++;
+      if (i >= STORES.length) {
+        clearInterval(timer.current); setStep(-1); set('dealsCheckedAt', iso(new Date()));
+        const n = left.filter(x => findDeal(x.name)).length;
+        notify(n ? `${n} af ${left.length} varer er på tilbud` : 'Ingen af varerne er på tilbud i denne uge');
+      } else setStep(i);
+    }, 420);
+  };
+  const dealItems = checked ? left.map(i => ({ i, d:findDeal(i.name) })).filter(x => x.d) : [];
+  const saving = dealItems.reduce((s, x) => s + (x.d.was - x.d.price), 0);
+  const byStore = STORES.map(s => ({ s, n:dealItems.filter(x => x.d.store === s).length })).filter(x => x.n);
+  const buildText = () => {
+    const lines = [`Hej Claude! Tjek denne indkøbsliste mod ugens tilbudsaviser fra ${STORES.join(', ')}. Fortæl mig hvilke varer der er på tilbud, i hvilken butik og til hvilken pris, og foreslå hvilken butik eller kombination der giver den billigste tur.`, '', `Min indkøbsliste (uge ${isoWeek(new Date())}):`];
+    CATS.forEach(c => { const l = left.filter(i => i.cat === c.id); if (l.length) { lines.push('', c.name); l.forEach(i => lines.push('- ' + i.name)); } });
+    return lines.join('\n');
+  };
+  const copy = async () => {
+    if (!left.length) { notify('Listen er tom'); return; }
+    const text = buildText(); let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+    if (ok) notify('Listen er kopieret. Indsæt den i en Claude-chat.'); else setCopyBox(text);
+  };
+  const groups = CATS.map(c => ({ c, list:items.filter(i => i.cat === c.id).sort((a, b) => a.done - b.done) })).filter(g => g.list.length);
+  return <div>
+    <PageHead icon="cart" title="Indkøbsliste" sub={`${left.length} ${left.length === 1 ? 'vare' : 'varer'} tilbage · sorteret efter supermarkedets afdelinger`}>
+      <button className="btn" onClick={copy}><Icon name="copy" size={16} />Kopier liste til AI-tjek</button>
+      <button className="btn btn-primary" onClick={runCheck} disabled={step >= 0}><Icon name={step >= 0 ? 'loader' : 'tag'} size={16} className={step >= 0 ? 'animate-spin' : ''} />{checked ? 'Skjul tilbud' : 'Tjek tilbud'}</button>
+    </PageHead>
+    {step >= 0 && <div className="card p-4 mb-4 pop"><p className="text-sm font-semibold mb-2">Tjekker ugens tilbudsaviser</p>
+      <div className="flex flex-wrap gap-2">{STORES.map((s, i) => <span key={s} className={`chip ${i <= step ? '' : 'opacity-50'}`} style={{ cursor:'default' }}>{i < step ? <Icon name="check" size={14} className="text-good" /> : <Icon name="loader" size={14} className={i === step ? 'animate-spin' : ''} />}{s}</span>)}</div></div>}
+    {checked && step < 0 && <div className="rounded-2xl bg-goodsoft text-goodink p-4 mb-4 pop">
+      <p className="font-semibold flex items-center gap-2"><Icon name="tag" size={16} />{dealItems.length ? `${dealItems.length} af ${left.length} varer er på tilbud i uge ${isoWeek(new Date())}` : 'Ingen varer på tilbud denne uge'}</p>
+      {dealItems.length > 0 && <p className="text-sm mt-1 tnum">Du kan spare omkring {num(saving)} kr. {byStore.length > 0 && <>Fordelt på {byStore.map(x => `${x.s} (${x.n})`).join(', ')}.</>}</p>}
+      <p className="text-xs mt-2 opacity-80">Prototype: tilbuddene er simulerede eksempler. Brug "Kopier liste til AI-tjek" for et rigtigt tjek.</p></div>}
+    <form onSubmit={submit} className="card p-3 flex flex-wrap gap-2 mb-4">
+      <input id="shop-name" className="field flex-1 min-w-[160px]" value={name} onChange={e => setName(e.target.value)} placeholder="Tilføj vare, fx tomater" aria-label="Vare" />
+      <select id="shop-cat" className="field w-auto" value={cat} onChange={e => setCat(e.target.value)} aria-label="Kategori"><option value="auto">Auto-kategori</option>{CATS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <button className="btn btn-primary" type="submit"><Icon name="plus" size={16} />Tilføj</button>
+    </form>
+    <div className="mb-5">
+      <p className="lbl">Hurtig-tilføj</p>
+      <div className="flex flex-wrap gap-1.5">{QUICK.map(([n, c]) => { const on = items.some(i => !i.done && i.name.toLowerCase() === n.toLowerCase());
+        return <button key={n} className="chip" disabled={on} style={{ opacity:on ? .5 : 1 }} onClick={() => add(n, c)}>{on ? <Icon name="check" size={13} /> : <Icon name="plus" size={13} />}{n}</button>; })}</div>
+    </div>
+    {groups.length === 0 && <div className="card"><Empty icon="cart" text="Listen er tom. Tilføj varer ovenfor eller brug hurtig-tilføj." /></div>}
+    <div className="grid gap-4 lg:grid-cols-2 items-start">
+      {groups.map(({ c, list }) => <section key={c.id} className="card p-4 min-w-0">
+        <SectionTitle right={<span className="text-xs text-muted tnum">{list.filter(i => !i.done).length} / {list.length}</span>}>{c.name}</SectionTitle>
+        <ul className="flex flex-col">{list.map(i => { const d = checked && !i.done ? findDeal(i.name) : null;
+          return <li key={i.id} className="flex items-center gap-3 py-2 border-t border-line first:border-t-0">
+            <Check done={i.done} onClick={() => toggle(i.id)} label={`Afkryds ${i.name}`} />
+            <div className="min-w-0 flex-1">
+              <p className={`truncate ${i.done ? 'line-through text-muted' : 'font-medium'}`}>{i.name}</p>
+              {d && <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold rounded-full bg-goodsoft text-goodink px-2 py-0.5 mt-0.5"><Icon name="tag" size={12} />På tilbud i {d.store} til {num(d.price)} kr.<span className="font-normal opacity-80 tnum">(før {num(d.was)})</span></p>}
+            </div>
+            <button className="iconbtn" aria-label={`Fjern ${i.name}`} onClick={() => remove(i.id)}><Icon name="x" size={16} /></button>
+          </li>; })}</ul>
+      </section>)}
+    </div>
+    {items.some(i => i.done) && <div className="mt-4"><button className="btn btn-sm" onClick={() => set('shopping', l => l.filter(i => !i.done))}><Icon name="trash" size={14} />Ryd afkrydsede varer</button></div>}
+    {copyBox && <Modal title="Kopiér listen" onClose={() => setCopyBox(null)}>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <p className="text-sm text-muted">Dit vindue tillader ikke automatisk kopiering. Markér teksten og kopiér den, og indsæt den i en Claude-chat.</p>
+        <textarea id="copy-text" className="field" rows={12} readOnly value={copyBox} onFocus={e => e.target.select()} autoFocus />
+        <button className="btn btn-primary self-end" onClick={() => setCopyBox(null)}>Luk</button></div></Modal>}
+  </div>;
+}
+/* ---------- Madplan ---------- */
+function MealModal({ date, init, onClose }) {
+  const { db, set } = useApp();
+  const [f, setF] = useState({ dish:init?.dish || '', cook:init?.cook || '', ing:(init?.ingredients || []).join('\n'), save:false });
+  const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const onDish = v => {
+    const r = db.recipes.find(x => x.name.toLowerCase() === v.toLowerCase());
+    setF(p => ({ ...p, dish:v, ing:r && !p.ing.trim() ? r.ingredients.join('\n') : p.ing }));
+  };
+  const parseIng = s => s.split('\n').map(x => x.trim()).filter(Boolean);
+  const submit = e => {
+    e.preventDefault();
+    const ings = parseIng(f.ing); const dish = f.dish.trim();
+    if (!dish) { set('meals', m => { const n = { ...m }; delete n[date]; return n; }); onClose(); return; }
+    set('meals', m => ({ ...m, [date]:{ dish, cook:f.cook, ingredients:ings, transferred:false } }));
+    if (f.save && !db.recipes.some(r => r.name.toLowerCase() === dish.toLowerCase())) set('recipes', l => [...l, { id:uid(), name:dish, ingredients:ings }]);
+    onClose();
+  };
+  return <FormModal title={`Madplan, ${fmtLong(parse(date)).toLowerCase()}`} onClose={onClose} onSubmit={submit}>
+    <Field label="Ret"><input className="field" autoFocus list="recipe-list" value={f.dish} onChange={e => onDish(e.target.value)} placeholder="Fx lasagne" />
+      <datalist id="recipe-list">{db.recipes.map(r => <option key={r.id} value={r.name} />)}</datalist></Field>
+    <div><span className="lbl">Kokketjans</span><MemberPick all none="Ikke fordelt" value={f.cook} onChange={v => u('cook', v)} /></div>
+    <Field label="Ingredienser (én pr. linje)"><textarea className="field" rows={6} value={f.ing} onChange={e => u('ing', e.target.value)} placeholder={'Hakket oksekød\nLøg\nTomater på dåse'} /></Field>
+    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.save} onChange={e => u('save', e.target.checked)} />Gem som opskrift</label>
+  </FormModal>;
+}
+function Madplan() {
+  const { db, set, notify, go } = useApp();
+  const [off, setOff] = useState(0); const [edit, setEdit] = useState(null);
+  const [rf, setRf] = useState({ name:'', ing:'' });
+  const ws = addDays(startOfWeek(new Date()), off * 7);
+  const days = Array.from({ length:7 }, (_, i) => addDays(ws, i));
+  const today = iso(new Date());
+  const pending = days.map(iso).filter(k => { const m = db.meals[k]; return m && m.ingredients && m.ingredients.length && !m.transferred; });
+  const transfer = keys => {
+    const shopping = [...db.shopping]; const meals = { ...db.meals }; let added = 0;
+    keys.forEach(k => {
+      const m = meals[k]; if (!m) return;
+      (m.ingredients || []).forEach(ing => {
+        const nm = ing.trim();
+        if (nm && !shopping.some(s => !s.done && s.name.toLowerCase() === nm.toLowerCase())) { shopping.push({ id:uid(), name:nm, cat:guessCat(nm), done:false }); added++; }
+      });
+      meals[k] = { ...m, transferred:true };
+    });
+    set('shopping', shopping); set('meals', meals);
+    notify(added ? `${added} ${added === 1 ? 'vare' : 'varer'} lagt på indkøbslisten` : 'Alt var allerede på listen', { label:'Se listen', fn:() => go('indkoeb') });
+  };
+  const addRecipe = e => {
+    e.preventDefault(); const name = rf.name.trim(); if (!name) return;
+    set('recipes', l => [...l, { id:uid(), name, ingredients:rf.ing.split('\n').map(x => x.trim()).filter(Boolean) }]);
+    setRf({ name:'', ing:'' });
+  };
+  return <div>
+    <PageHead icon="utensils" title="Madplan og opskrifter" sub={`Uge ${isoWeek(ws)} · ${fmtShort(ws)} til ${fmtShort(addDays(ws, 6))}`}>
+      <div className="flex items-center gap-1">
+        <button className="iconbtn" aria-label="Forrige uge" onClick={() => setOff(o => o - 1)}><Icon name="left" /></button>
+        <button className="btn btn-sm" onClick={() => setOff(0)}>Denne uge</button>
+        <button className="iconbtn" aria-label="Næste uge" onClick={() => setOff(o => o + 1)}><Icon name="right" /></button>
+      </div>
+      <button className="btn btn-primary" disabled={!pending.length} onClick={() => transfer(pending)}><Icon name="cart" size={16} />Ingredienser til indkøbslisten</button>
+    </PageHead>
+    <div className="card divide-y divide-line mb-6">
+      {days.map(d => { const k = iso(d); const m = db.meals[k];
+        return <div key={k} className={`grid gap-x-4 gap-y-2 p-3 sm:p-4 sm:grid-cols-[120px_1fr_auto] items-center ${k === today ? 'bg-accentsoft' : ''}`}>
+          <div><p className="font-display font-semibold">{DAYS[dayIdx(d)]}</p><p className="text-xs text-muted tnum">{fmtShort(d)}</p></div>
+          <button className="text-left min-w-0" onClick={() => setEdit(k)}>
+            {m && m.dish ? <>
+              <p className="font-semibold truncate">{m.dish}</p>
+              <p className="text-sm text-muted flex flex-wrap items-center gap-x-2 gap-y-1">{m.cook ? <Who id={m.cook} small /> : <span>Kokketjans ikke fordelt</span>}
+                <span>{m.ingredients.length} ingredienser</span>{m.transferred && <span className="inline-flex items-center gap-1 text-goodink"><Icon name="check" size={13} />På listen</span>}</p>
+            </> : <p className="text-muted flex items-center gap-1.5"><Icon name="plus" size={15} />Tilføj ret</p>}
+          </button>
+          <div className="flex items-center gap-1">
+            {m && m.dish && m.ingredients.length > 0 && <button className="btn btn-sm" onClick={() => transfer([k])} title="Læg ingredienser på indkøbslisten"><Icon name="cart" size={14} />Til listen</button>}
+            <button className="iconbtn" aria-label={`Redigér ${DAYS[dayIdx(d)]}`} onClick={() => setEdit(k)}><Icon name="pencil" size={16} /></button>
+          </div>
+        </div>; })}
+    </div>
+    <SectionTitle>Opskrifter</SectionTitle>
+    <div className="grid gap-4 lg:grid-cols-[1fr_340px] items-start">
+      <div className="grid gap-3 sm:grid-cols-2 min-w-0">
+        {db.recipes.map(r => <article key={r.id} className="card p-4 min-w-0">
+          <div className="flex items-start justify-between gap-2"><h3 className="font-semibold">{r.name}</h3>
+            <button className="iconbtn" aria-label={`Slet ${r.name}`} onClick={() => set('recipes', l => l.filter(x => x.id !== r.id))}><Icon name="trash" size={15} /></button></div>
+          <p className="text-sm text-muted mt-1">{r.ingredients.join(', ') || 'Ingen ingredienser'}</p>
+        </article>)}
+        {!db.recipes.length && <div className="card sm:col-span-2"><Empty icon="utensils" text="Ingen opskrifter endnu. Gem en ret som opskrift, eller tilføj en her." /></div>}
+      </div>
+      <form onSubmit={addRecipe} className="card p-4 flex flex-col gap-3">
+        <h3 className="font-semibold">Ny opskrift</h3>
+        <Field label="Navn"><input id="rec-name" className="field" value={rf.name} onChange={e => setRf(p => ({ ...p, name:e.target.value }))} /></Field>
+        <Field label="Ingredienser (én pr. linje)"><textarea id="rec-ing" className="field" rows={4} value={rf.ing} onChange={e => setRf(p => ({ ...p, ing:e.target.value }))} /></Field>
+        <button className="btn btn-primary self-start" type="submit"><Icon name="plus" size={16} />Gem opskrift</button>
+      </form>
+    </div>
+    {edit && <MealModal date={edit} init={db.meals[edit]} onClose={() => setEdit(null)} />}
+  </div>;
+}
+
+/* ---------- Træning ---------- */
+function findConflicts(sessions) {
+  const out = [];
+  for (let day = 0; day < 7; day++) {
+    const l = sessions.filter(s => s.day === day);
+    for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++) {
+      const a = l[i], b = l[j];
+      const a0 = toMin(a.start), a1 = a0 + a.duration, b0 = toMin(b.start), b1 = b0 + b.duration;
+      if (!(a0 < b1 && b0 < a1)) continue;
+      if (a.driver && a.driver === b.driver) out.push({ day, kind:'driver', who:a.driver, a, b });
+      else if (a.member === b.member) out.push({ day, kind:'member', who:a.member, a, b });
+    }
+  }
+  return out;
+}
+function SessionModal({ init, onClose }) {
+  const { set } = useApp();
+  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const submit = e => {
+    e.preventDefault();
+    const s = { ...f, duration:Math.max(5, Number(f.duration) || 60) };
+    if (s.id) set('sessions', l => l.map(x => x.id === s.id ? s : x)); else set('sessions', l => [...l, { ...s, id:uid() }]);
+    onClose();
+  };
+  const del = () => { set('sessions', l => l.filter(x => x.id !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér træning' : 'Ny træning'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <div><span className="lbl">Hvem træner</span><MemberPick value={f.member} onChange={v => u('member', v)} /></div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Field label="Aktivitet"><select className="field" value={f.activity} onChange={e => u('activity', e.target.value)}>{ACTIVITIES.map(a => <option key={a}>{a}</option>)}</select></Field>
+      <Field label="Ugedag"><select className="field" value={f.day} onChange={e => u('day', Number(e.target.value))}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></Field>
+      <Field label="Starter"><input type="time" className="field" value={f.start} onChange={e => u('start', e.target.value)} required /></Field>
+      <Field label="Varighed (minutter)"><input type="number" min="5" step="5" className="field" value={f.duration} onChange={e => u('duration', e.target.value)} /></Field>
+    </div>
+    <Field label="Sted"><input className="field" value={f.place} onChange={e => u('place', e.target.value)} placeholder="Fx stadion" /></Field>
+    <div><span className="lbl">Hvem kører eller passer</span><MemberPick none="Ingen kørsel" value={f.driver} onChange={v => u('driver', v)} /></div>
+  </FormModal>;
+}
+function GoalModal({ init, onClose }) {
+  const { set } = useApp();
+  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const submit = e => {
+    e.preventDefault(); if (!f.title.trim()) return;
+    const g = { ...f, title:f.title.trim(), target:Number(f.target) || 1, current:Number(f.current) || 0 };
+    if (g.id) set('goals', l => l.map(x => x.id === g.id ? g : x)); else set('goals', l => [...l, { ...g, id:uid() }]);
+    onClose();
+  };
+  const del = () => { set('goals', l => l.filter(x => x.id !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér mål' : 'Nyt mål'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <div><span className="lbl">Hvem</span><MemberPick value={f.member} onChange={v => u('member', v)} /></div>
+    <Field label="Mål"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx løb 100 km i november" /></Field>
+    <div className="grid grid-cols-3 gap-3">
+      <Field label="Mål"><input type="number" step="any" className="field" value={f.target} onChange={e => u('target', e.target.value)} /></Field>
+      <Field label="Nu"><input type="number" step="any" className="field" value={f.current} onChange={e => u('current', e.target.value)} /></Field>
+      <Field label="Enhed"><select className="field" value={f.unit} onChange={e => u('unit', e.target.value)}>{['km','kg','gange','min'].map(x => <option key={x}>{x}</option>)}</select></Field>
+    </div>
+  </FormModal>;
+}
+function Traening() {
+  const { db, set } = useApp();
+  const [modal, setModal] = useState(null); const [goal, setGoal] = useState(null); const [logs, setLogs] = useState({});
+  const today = dayIdx(new Date());
+  const conflicts = findConflicts(db.sessions);
+  const nm = id => memberFor(db, id).name;
+  const newSession = day => setModal({ member:db.members[0].id, activity:'Løb', day, start:'17:00', duration:60, place:'', driver:'', note:'' });
+  const log = g => { const v = Number(logs[g.id]); if (!v) return; set('goals', l => l.map(x => x.id === g.id ? { ...x, current:Math.round((x.current + v) * 100) / 100 } : x)); setLogs(p => ({ ...p, [g.id]:'' })); };
+  return <div>
+    <PageHead icon="dumbbell" title="Træningsplan" sub="Ugens træning, kørsel og mål samlet">
+      <button className="btn btn-primary" onClick={() => newSession(today)}><Icon name="plus" size={16} />Ny træning</button>
+    </PageHead>
+    {conflicts.length > 0 && <div className="rounded-xl bg-warnsoft px-4 py-3 mb-4 flex items-start gap-3">
+      <Icon name="alert" className="text-warn mt-0.5" /><div className="text-sm"><p className="font-semibold">Logistik overlapper</p>
+        {conflicts.map((c, i) => <p key={i} className="text-muted">{DAYS[c.day]}: {c.kind === 'driver' ? `${nm(c.who)} skal køre til både ${c.a.activity} (${nm(c.a.member)}) og ${c.b.activity} (${nm(c.b.member)})` : `${nm(c.who)} har to aktiviteter samtidig`} omkring {c.b.start}.</p>)}</div></div>}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-8">
+      {DAYS.map((dn, di) => { const l = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
+        return <section key={dn} className={`card p-3 flex flex-col gap-2 min-w-0 ${di === today ? 'ring-2 ring-accent' : ''}`}>
+          <div className="flex items-center justify-between"><h3 className="font-display font-semibold">{dn}</h3>
+            <button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Tilføj træning ${dn}`} onClick={() => newSession(di)}><Icon name="plus" size={16} /></button></div>
+          {l.map(s => { const m = memberFor(db, s.member); const bad = conflicts.some(c => c.a.id === s.id || c.b.id === s.id);
+            return <button key={s.id} onClick={() => setModal(s)} className="text-left rounded-lg px-2.5 py-2 min-w-0 hover:brightness-95" style={{ background:soft(m.color), outline:bad ? '2px solid var(--warn)' : 'none' }}>
+              <span className="flex items-center justify-between gap-2"><span className="font-semibold text-sm truncate">{s.activity}</span><span className="tnum text-xs text-muted shrink-0">{s.start}</span></span>
+              <span className="block text-xs text-muted truncate">{m.name}{s.place ? ` · ${s.place}` : ''} · {s.duration} min</span>
+              {s.driver && <span className="flex items-center gap-1 text-xs text-muted mt-0.5"><Icon name="car" size={12} />{nm(s.driver)} kører</span>}
+            </button>; })}
+          {!l.length && <p className="text-sm text-muted">Hviledag</p>}
+        </section>; })}
+    </div>
+    <SectionTitle right={<button className="btn btn-sm" onClick={() => setGoal({ member:db.members[0].id, title:'', unit:'km', target:10, current:0 })}><Icon name="plus" size={14} />Nyt mål</button>}>Mål</SectionTitle>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {db.goals.map(g => { const pct = Math.min(100, Math.round(g.current / g.target * 100)); const m = memberFor(db, g.member);
+        return <article key={g.id} className="card p-4 flex flex-col gap-3 min-w-0">
+          <div className="flex items-start justify-between gap-2"><div className="min-w-0"><Who id={g.member} small /><h3 className="font-semibold mt-1.5">{g.title}</h3></div>
+            <button className="iconbtn" aria-label="Redigér mål" onClick={() => setGoal(g)}><Icon name="pencil" size={15} /></button></div>
+          <div><div className="flex items-baseline justify-between text-sm"><span className="tnum"><b className="font-display text-xl">{num(g.current)}</b> / {num(g.target)} {g.unit}</span><span className="tnum text-muted">{pct}%</span></div>
+            <div className="h-2 rounded-full bg-surface2 mt-1.5 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"><div className="h-full rounded-full" style={{ width:pct + '%', background:pct >= 100 ? 'var(--good)' : m.color }} /></div></div>
+          {pct >= 100 ? <p className="text-sm font-semibold text-goodink flex items-center gap-1.5"><Icon name="check" size={15} />Målet er nået</p> :
+            <div className="flex gap-2"><input type="number" step="any" className="field" placeholder={`Log ${g.unit}`} aria-label={`Log ${g.unit}`} value={logs[g.id] || ''} onChange={e => setLogs(p => ({ ...p, [g.id]:e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); log(g); } }} />
+              <button className="btn" onClick={() => log(g)}>Log</button></div>}
+        </article>; })}
+      {!db.goals.length && <div className="card sm:col-span-2 xl:col-span-3"><Empty icon="target" text="Ingen mål endnu. Sæt et løbe- eller styrkemål." /></div>}
+    </div>
+    {modal && <SessionModal init={modal} onClose={() => setModal(null)} />}
+    {goal && <GoalModal init={goal} onClose={() => setGoal(null)} />}
+  </div>;
+}
+/* ---------- Pligter og lommepenge ---------- */
+const COLS = [{ id:'todo', name:'Skal laves' }, { id:'doing', name:'I gang' }, { id:'done', name:'Færdig' }];
+function TaskModal({ init, onClose }) {
+  const { db, set } = useApp();
+  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const unit = db.rewardUnit === 'kr' ? 'kroner' : 'point';
+  const submit = e => {
+    e.preventDefault(); if (!f.title.trim()) return;
+    const t = { ...f, title:f.title.trim(), reward:Math.max(0, Number(f.reward) || 0) };
+    if (t.id) set('tasks', l => l.map(x => x.id === t.id ? t : x)); else set('tasks', l => [...l, { ...t, id:uid() }]);
+    onClose();
+  };
+  const del = () => { set('tasks', l => l.filter(x => x.id !== f.id)); set('ledger', l => l.filter(x => x.taskId !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér opgave' : 'Ny opgave'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <Field label="Opgave"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx tøm opvasker" /></Field>
+    <div><span className="lbl">Hvem</span><MemberPick value={f.assignee} onChange={v => u('assignee', v)} /></div>
+    <Field label={`Belønning i ${unit} (valgfri)`}><input type="number" min="0" className="field" value={f.reward} onChange={e => u('reward', e.target.value)} /></Field>
+    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.recurring} onChange={e => u('recurring', e.target.checked)} />Gentages hver uge</label>
+  </FormModal>;
+}
+function PayModal({ member, mode, balance, onClose }) {
+  const { db, set } = useApp();
+  const unit = db.rewardUnit === 'kr' ? 'kr.' : 'point';
+  const [amount, setAmount] = useState(mode === 'payout' ? String(balance) : '10');
+  const [label, setLabel] = useState(mode === 'payout' ? 'Udbetaling' : 'Bonus');
+  const submit = e => {
+    e.preventDefault(); const a = Number(amount); if (!a || a <= 0) return;
+    set('ledger', l => [...l, { id:uid(), member, amount:mode === 'payout' ? -a : a, label:label.trim() || (mode === 'payout' ? 'Udbetaling' : 'Bonus'), date:iso(new Date()), taskId:null }]);
+    onClose();
+  };
+  return <FormModal title={`${mode === 'payout' ? 'Udbetal til' : 'Giv bonus til'} ${memberFor(db, member).name}`} onClose={onClose} onSubmit={submit} submitLabel={mode === 'payout' ? 'Udbetal' : 'Giv bonus'}>
+    <Field label={`Beløb (${unit})`}><input type="number" min="1" step="any" className="field" autoFocus value={amount} onChange={e => setAmount(e.target.value)} /></Field>
+    <Field label="Tekst"><input className="field" value={label} onChange={e => setLabel(e.target.value)} /></Field>
+  </FormModal>;
+}
+function Pligter() {
+  const { db, set, up, notify } = useApp();
+  const [view, setView] = useState('board'); const [who, setWho] = useState('all');
+  const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
+  const unitKr = db.rewardUnit === 'kr';
+  const money = n => unitKr ? `${num(n)} kr.` : `${num(n)} point`;
+  const tasks = db.tasks.filter(t => who === 'all' || t.assignee === who);
+  const kids = db.members.filter(m => m.child);
+  const balance = id => db.ledger.filter(l => l.member === id).reduce((s, l) => s + l.amount, 0);
+  const move = (task, status) => up(d => {
+    let ledger = d.ledger.filter(l => l.taskId !== task.id);
+    if (status === 'done' && task.reward > 0) ledger = [...ledger, { id:uid(), member:task.assignee, amount:task.reward, label:task.title, date:iso(new Date()), taskId:task.id }];
+    return { ...d, tasks:d.tasks.map(t => t.id === task.id ? { ...t, status } : t), ledger };
+  });
+  const order = ['todo', 'doing', 'done'];
+  const resetWeek = () => {
+    const n = db.tasks.filter(t => t.status === 'done' && t.recurring).length;
+    set('tasks', l => l.map(t => t.status === 'done' && t.recurring ? { ...t, status:'todo' } : t));
+    notify(n ? `${n} gentagende opgaver er nulstillet til ny uge` : 'Ingen færdige, gentagende opgaver at nulstille');
+  };
+  const newTask = status => setModal({ title:'', assignee:(kids[0] || db.members[0]).id, status:status || 'todo', reward:5, recurring:false });
+  const TaskCard = ({ t }) => { const i = order.indexOf(t.status);
+    return <div className="rounded-xl border border-line bg-surface p-3 flex flex-col gap-2">
+      <button className="text-left" onClick={() => setModal(t)}><p className={`font-semibold text-sm ${t.status === 'done' ? 'line-through text-muted' : ''}`}>{t.title}</p></button>
+      <div className="flex flex-wrap items-center gap-1.5"><Who id={t.assignee} small />
+        {t.reward > 0 && <span className="inline-flex items-center rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
+        {t.recurring && <span className="inline-flex items-center gap-1 text-xs text-muted"><Icon name="repeat" size={12} />Ugentlig</span>}</div>
+      <div className="flex items-center gap-1 -mb-1">
+        <button className="iconbtn" disabled={i === 0} aria-label="Ryk tilbage" onClick={() => move(t, order[i - 1])}><Icon name="left" size={16} /></button>
+        <button className="iconbtn" disabled={i === 2} aria-label="Ryk frem" onClick={() => move(t, order[i + 1])}><Icon name="right" size={16} /></button>
+        <span className="flex-1" />
+        {t.status !== 'done' && <button className="btn btn-sm" onClick={() => move(t, 'done')}><Icon name="check" size={14} />Færdig</button>}
+      </div></div>; };
+  const recent = [...db.ledger].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+  return <div>
+    <PageHead icon="listchecks" title="Pligter og lommepenge" sub="Opgaver til hele familien og børnenes optjening">
+      <div className="seg"><button aria-pressed={unitKr} onClick={() => set('rewardUnit', 'kr')}>Kroner</button><button aria-pressed={!unitKr} onClick={() => set('rewardUnit', 'point')}>Point</button></div>
+      <div className="seg" aria-label="Visning"><button aria-pressed={view === 'board'} onClick={() => setView('board')} aria-label="Tavle"><Icon name="grid" size={14} /></button><button aria-pressed={view === 'list'} onClick={() => setView('list')} aria-label="Liste"><Icon name="list" size={14} /></button></div>
+      <button className="btn" onClick={resetWeek}><Icon name="reset" size={16} />Ny uge</button>
+      <button className="btn btn-primary" onClick={() => newTask()}><Icon name="plus" size={16} />Ny opgave</button>
+    </PageHead>
+    {kids.length > 0 && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 mb-6">
+      {kids.map(k => <section key={k.id} className="card p-4 flex flex-col gap-3 min-w-0">
+        <div className="flex items-center justify-between gap-2"><Who id={k.id} /><Icon name="wallet" className="text-muted" /></div>
+        <p className="font-display text-3xl font-semibold tnum">{money(balance(k.id))}</p>
+        <div className="flex gap-2"><button className="btn btn-sm" disabled={balance(k.id) <= 0} onClick={() => setPay({ member:k.id, mode:'payout', balance:balance(k.id) })}>Udbetal</button>
+          <button className="btn btn-sm" onClick={() => setPay({ member:k.id, mode:'bonus', balance:0 })}>Giv bonus</button></div>
+      </section>)}
+      <section className="card p-4 min-w-0 sm:col-span-2 xl:col-span-1"><p className="lbl">Seneste bevægelser</p>
+        {recent.length === 0 ? <p className="text-sm text-muted">Ingen endnu.</p> : <ul className="flex flex-col gap-1">{recent.map(l => <li key={l.id} className="flex items-center gap-2 text-sm"><Dot color={memberFor(db, l.member).color} size={8} /><span className="truncate flex-1">{l.label}</span><span className={`tnum font-semibold ${l.amount < 0 ? 'text-muted' : 'text-goodink'}`}>{l.amount > 0 ? '+' : ''}{num(l.amount)}</span></li>)}</ul>}
+      </section>
+    </div>}
+    <div className="flex flex-wrap gap-2 mb-4">
+      <button className="chip" aria-pressed={who === 'all'} onClick={() => setWho('all')}>Alle</button>
+      {db.members.map(m => <button key={m.id} className="chip" aria-pressed={who === m.id} onClick={() => setWho(m.id)}><Dot color={m.color} size={9} />{m.name}</button>)}
+    </div>
+    {view === 'board' ? <div className="grid gap-3 md:grid-cols-3 items-start">
+      {COLS.map(c => { const l = tasks.filter(t => t.status === c.id);
+        return <section key={c.id} className="rounded-2xl bg-surface2 border border-line p-3 flex flex-col gap-2 min-w-0">
+          <div className="flex items-center justify-between px-1"><h2 className="font-display font-semibold">{c.name} <span className="text-muted font-normal tnum">{l.length}</span></h2>
+            <button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Ny opgave i ${c.name}`} onClick={() => newTask(c.id)}><Icon name="plus" size={16} /></button></div>
+          {l.map(t => <TaskCard key={t.id} t={t} />)}
+          {!l.length && <p className="text-sm text-muted px-1 py-3">Ingen opgaver</p>}
+        </section>; })}
+    </div> : <div className="card divide-y divide-line">
+      {tasks.map(t => <div key={t.id} className="flex items-center gap-3 p-3">
+        <Check done={t.status === 'done'} label={`Marker ${t.title}`} onClick={() => move(t, t.status === 'done' ? 'todo' : 'done')} />
+        <button className="text-left min-w-0 flex-1" onClick={() => setModal(t)}><p className={`font-medium truncate ${t.status === 'done' ? 'line-through text-muted' : ''}`}>{t.title}</p></button>
+        {t.reward > 0 && <span className="hidden sm:inline-flex rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
+        <Who id={t.assignee} small />
+      </div>)}
+      {!tasks.length && <Empty icon="listchecks" text="Ingen opgaver her endnu." />}
+    </div>}
+    {modal && <TaskModal init={modal} onClose={() => setModal(null)} />}
+    {pay && <PayModal {...pay} onClose={() => setPay(null)} />}
+  </div>;
+}
+
+/* ---------- Køleskabsdøren ---------- */
+const NOTE_TEMPLATES = ['Husk madpakke i morgen!', 'Mor henter kl. 15:30', 'Husk gymnastiktøj', 'Husk at give hunden mad', 'Hent pakke på posthuset'];
+function Koeleskab() {
+  const { db, set } = useApp();
+  const [text, setText] = useState(''); const [author, setAuthor] = useState(db.members[0].id); const [color, setColor] = useState('note1');
+  const [off, setOff] = useState(0); const [rule, setRule] = useState({ text:'', day:-1 });
+  const kids = db.members.filter(m => m.child);
+  const ws = addDays(startOfWeek(new Date()), off * 7);
+  const school = Array.from({ length:5 }, (_, i) => addDays(ws, i));
+  const tomorrowKey = iso(addDays(new Date(), 1)); const today = iso(new Date()); const di = dayIdx(new Date());
+  const post = (t) => { const v = (t ?? text).trim(); if (!v) return; set('notes', l => [{ id:uid(), text:v, author, color, pinned:false }, ...l]); setText(''); };
+  const notes = [...db.notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  const cycle = (k, id) => set('lunch', L => { const cur = (L[k] || {})[id] || ''; const nxt = LUNCH_STATES[(LUNCH_STATES.findIndex(s => s.id === cur) + 1) % LUNCH_STATES.length].id; return { ...L, [k]:{ ...(L[k] || {}), [id]:nxt } }; });
+  const stateOf = (k, id) => LUNCH_STATES.find(s => s.id === ((db.lunch[k] || {})[id] || '')) || LUNCH_STATES[0];
+  const addRule = e => { e.preventDefault(); const v = rule.text.trim(); if (!v) return; set('rules', l => [...l, { id:uid(), text:v, day:Number(rule.day) }]); setRule(r => ({ ...r, text:'' })); };
+  return <div>
+    <PageHead icon="pin" title="Køleskabsdøren" sub="Hurtige beskeder, madpakker og huskeregler" />
+    <section className="card p-4 mb-6 flex flex-col gap-3">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <textarea id="note-text" className="field flex-1" rows={2} value={text} onChange={e => setText(e.target.value)} placeholder="Skriv en besked til familien" aria-label="Besked" />
+        <button className="btn btn-primary sm:self-stretch" onClick={() => post()}><Icon name="pin" size={16} />Hæng op</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="flex items-center gap-2"><span className="lbl mb-0">Fra</span><MemberPick value={author} onChange={setAuthor} /></div>
+        <div className="flex items-center gap-2"><span className="lbl mb-0">Farve</span>{NOTE_COLORS.map(c => <button key={c} type="button" aria-label={`Farve ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className="w-7 h-7 rounded-full border-2" style={{ background:`var(--${c})`, borderColor:color === c ? 'var(--ink)' : 'var(--line)' }} />)}</div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">{NOTE_TEMPLATES.map(t => <button key={t} className="chip" onClick={() => post(t)}><Icon name="plus" size={13} />{t}</button>)}</div>
+    </section>
+    {notes.length === 0 ? <div className="card mb-6"><Empty icon="pin" text="Ingen beskeder. Hæng den første op." /></div> :
+      <div className="columns-1 sm:columns-2 xl:columns-3 gap-3 mb-8">{notes.map(n => <article key={n.id} className="break-inside-avoid mb-3 rounded-xl p-4 text-ink" style={{ background:`var(--${n.color})`, border:'1px solid var(--line)' }}>
+        <p className="font-semibold leading-snug whitespace-pre-wrap">{n.text}</p>
+        <div className="flex items-center justify-between mt-3 gap-2"><Who id={n.author} small />
+          <span className="flex items-center"><button className="iconbtn" style={{ width:30, height:30, color:n.pinned ? 'var(--accent)' : undefined }} aria-pressed={n.pinned} aria-label={n.pinned ? 'Fjern markering' : 'Fastgør'} onClick={() => set('notes', l => l.map(x => x.id === n.id ? { ...x, pinned:!x.pinned } : x))}><Icon name="pin" size={15} /></button>
+            <button className="iconbtn" style={{ width:30, height:30 }} aria-label="Fjern besked" onClick={() => set('notes', l => l.filter(x => x.id !== n.id))}><Icon name="x" size={15} /></button></span></div>
+      </article>)}</div>}
+    <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr] items-start">
+      <section className="card p-4 min-w-0">
+        <SectionTitle right={<div className="flex items-center gap-1"><button className="iconbtn" aria-label="Forrige uge" onClick={() => setOff(o => o - 1)}><Icon name="left" size={16} /></button><span className="text-sm text-muted tnum">Uge {isoWeek(ws)}</span><button className="iconbtn" aria-label="Næste uge" onClick={() => setOff(o => o + 1)}><Icon name="right" size={16} /></button></div>}>Madpakkestatus</SectionTitle>
+        {kids.length === 0 ? <Empty icon="users" text="Marker børn under Familie for at se madpakker." /> : <>
+          <div className="rounded-xl bg-surface2 px-3 py-2 mb-3 text-sm flex flex-wrap gap-x-4 gap-y-1"><span className="font-semibold">I morgen:</span>{kids.map(k => <span key={k.id} className="inline-flex items-center gap-1.5"><Dot color={k.color} size={8} />{k.name}: <b className="font-semibold">{stateOf(tomorrowKey, k.id).label}</b></span>)}</div>
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[460px]"><thead><tr><th className="text-left lbl py-1 w-24"> </th>{school.map(d => <th key={iso(d)} className={`lbl text-center py-1 ${iso(d) === today ? 'text-accent' : ''}`}>{DS[dayIdx(d)]} {d.getDate()}</th>)}</tr></thead>
+            <tbody>{kids.map(k => <tr key={k.id}><td className="py-1 pr-2"><Who id={k.id} small /></td>
+              {school.map(d => { const k2 = iso(d); const s = stateOf(k2, k.id);
+                return <td key={k2} className="p-0.5"><button onClick={() => cycle(k2, k.id)} className={`w-full rounded-lg border border-line bg-surface hover:bg-surface2 py-2 text-xs font-semibold ${s.cls}`} aria-label={`${k.name} ${DAYS[dayIdx(d)]}: ${s.label}. Tryk for at skifte.`}>{s.label}</button></td>; })}</tr>)}</tbody></table></div>
+          <p className="text-xs text-muted mt-2">Tryk på en dag for at skifte mellem madpakke, skolemad, særligt og fri.</p></>}
+      </section>
+      <section className="card p-4 min-w-0">
+        <SectionTitle>Huskeregler</SectionTitle>
+        <ul className="flex flex-col gap-1 mb-3">{db.rules.map(r => { const now = r.day === -1 || r.day === di;
+          return <li key={r.id} className="flex items-center gap-2 py-1.5 border-b border-line last:border-b-0">
+            <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{r.text}</span><span className="block text-xs text-muted">{r.day === -1 ? 'Hver dag' : `Hver ${DAYS[r.day].toLowerCase()}`}</span></span>
+            {now && <span className="text-[11px] font-semibold rounded-full bg-warnsoft text-warn px-2 py-0.5">I dag</span>}
+            <button className="iconbtn" aria-label="Fjern regel" onClick={() => set('rules', l => l.filter(x => x.id !== r.id))}><Icon name="x" size={15} /></button></li>; })}
+          {!db.rules.length && <li className="text-sm text-muted">Ingen regler endnu.</li>}</ul>
+        <form onSubmit={addRule} className="flex flex-col gap-2">
+          <input id="rule-text" className="field" placeholder="Ny huskeregel" aria-label="Huskeregel" value={rule.text} onChange={e => setRule(r => ({ ...r, text:e.target.value }))} />
+          <div className="flex gap-2"><select id="rule-day" className="field" aria-label="Dag" value={rule.day} onChange={e => setRule(r => ({ ...r, day:e.target.value }))}><option value={-1}>Hver dag</option>{DAYS.map((d, i) => <option key={d} value={i}>Hver {d.toLowerCase()}</option>)}</select>
+            <button className="btn btn-primary" type="submit"><Icon name="plus" size={16} />Tilføj</button></div>
+        </form>
+      </section>
+    </div>
+  </div>;
+}
+/* ---------- Familie og app-skal ---------- */
+function FamilyModal({ onClose }) {
+  const { db, set } = useApp();
+  const [ms, setMs] = useState(db.members.map(m => ({ ...m })));
+  const upd = (id, p) => setMs(l => l.map(m => m.id === id ? { ...m, ...p } : m));
+  const submit = e => { e.preventDefault(); set('members', ms.map(m => ({ ...m, name:m.name.trim() || m.id }))); onClose(); };
+  return <FormModal title="Familiemedlemmer" onClose={onClose} onSubmit={submit}>
+    <p className="text-sm text-muted">Giv hver person et navn. Farven bruges i kalender, madplan og pligter. Børn får lommepengekonto.</p>
+    {ms.map(m => <div key={m.id} className="flex items-center gap-3">
+      <Dot color={m.color} size={14} />
+      <input className="field flex-1" value={m.name} onChange={e => upd(m.id, { name:e.target.value })} aria-label={`Navn for ${m.id}`} />
+      <label className="flex items-center gap-1.5 text-sm shrink-0"><input type="checkbox" checked={m.child} onChange={e => upd(m.id, { child:e.target.checked })} />Barn</label>
+    </div>)}
+  </FormModal>;
+}
+
+const NAV = [
+  { id:'overblik', label:'Overblik', icon:'home' },
+  { id:'kalender', label:'Kalender', icon:'calendar' },
+  { id:'foedselsdage', label:'Fødselsdage', icon:'cake' },
+  { id:'indkoeb', label:'Indkøb', icon:'cart' },
+  { id:'madplan', label:'Madplan', icon:'utensils' },
+  { id:'traening', label:'Træning', icon:'dumbbell' },
+  { id:'pligter', label:'Pligter', icon:'listchecks' },
+  { id:'koeleskab', label:'Køleskabsdør', icon:'pin' }
+];
+const VIEWS = { overblik:Overblik, kalender:Kalender, foedselsdage:Foedselsdage, indkoeb:Indkoeb, madplan:Madplan, traening:Traening, pligter:Pligter, koeleskab:Koeleskab };
+
+function App() {
+  const [db, setDb] = useState(loadDb);
+  const [toast, setToast] = useState(null); const [fam, setFam] = useState(false); const [share, setShare] = useState(false);
+  const fsync = useFamilySync(db, setDb);
+  const shareDot = { on:'var(--good)', connecting:'var(--warn)', error:'var(--danger)' }[fsync.status] || 'var(--muted)';
+  const shareLabel = fsync.status === 'on' ? 'Delt med familien' : fsync.status === 'error' ? 'Deling: fejl' : fsync.code ? 'Forbinder ...' : 'Del med familien';
+  const toastTimer = useRef(null);
+  const [ext, setExt] = useState(() => {
+    try { const r = localStorage.getItem(EXT_KEY); if (r) return { status:'cached', data:JSON.parse(r), checked:null }; } catch (e) {}
+    return { status:'idle', data:null, checked:null };
+  });
+  const refreshExt = async () => {
+    setExt(x => ({ ...x, status:'loading' }));
+    try {
+      const res = await fetch('data/calendar-events.json?t=' + Date.now(), { cache:'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data || !Array.isArray(data.events)) throw new Error('Ugyldigt format');
+      try { localStorage.setItem(EXT_KEY, JSON.stringify(data)); } catch (e) {}
+      setExt({ status:'ok', data, checked:new Date() });
+    } catch (e) { setExt(x => ({ status:x.data ? 'cached' : 'none', data:x.data, checked:new Date() })); }
+  };
+  useEffect(() => {
+    refreshExt();
+    const t = setInterval(refreshExt, 10 * 60 * 1000);
+    const vis = () => { if (document.visibilityState === 'visible') refreshExt(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, []);
+  const extByDate = useMemo(() => {
+    const m = {}; if (!ext.data) return m;
+    const hidden = db.feedHidden || {}; const fm = db.feedMap || {}; const feeds = {};
+    (ext.data.feeds || []).forEach(f => { feeds[f.id] = f; });
+    ext.data.events.forEach(e => {
+      if (hidden[e.feed]) return;
+      const f = feeds[e.feed] || {};
+      (m[e.date] = m[e.date] || []).push({ id:'x:' + e.id, ext:true, title:e.title, date:e.date, start:e.start || '', end:e.end || '',
+        member:fm[e.feed] || f.member || 'all', feedName:f.name || e.feed, location:e.location || '', note:e.desc || '', allDay:!!e.allDay });
+    });
+    return m;
+  }, [ext.data, db.feedMap, db.feedHidden]);
+  const eventsFor = k => [...db.events.filter(e => e.date === k), ...(extByDate[k] || [])];
+  useEffect(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) {} }, [db]);
+  useEffect(() => {
+    const r = document.documentElement;
+    if (db.ui.theme === 'system') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', db.ui.theme);
+  }, [db.ui.theme]);
+  const set = (k, v) => setDb(d => ({ ...d, [k]:typeof v === 'function' ? v(d[k]) : v }));
+  const up = fn => setDb(d => fn(d));
+  const go = tab => { set('ui', u => ({ ...u, tab })); window.scrollTo(0, 0); };
+  const notify = (msg, action) => { setToast({ msg, action }); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4200); };
+  const clearDemo = () => setDb(d => ({ ...emptyDb(), members:d.members, ui:d.ui, feedMap:d.feedMap || {}, feedHidden:d.feedHidden || {} }));
+  const tab = VIEWS[db.ui.tab] ? db.ui.tab : 'overblik'; const View = VIEWS[tab];
+  const isDark = db.ui.theme === 'dark' || (db.ui.theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const toggleTheme = () => set('ui', u => ({ ...u, theme:isDark ? 'light' : 'dark' }));
+  const Brand = () => <div className="flex items-center gap-2.5 min-w-0">
+    <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-accent text-accentink shrink-0"><Icon name="home" size={19} /></span>
+    <span className="min-w-0"><span className="block font-display font-semibold leading-tight">Familieplanlægger</span><span className="block text-xs text-muted tnum">Uge {isoWeek(new Date())}</span></span></div>;
+  return <Ctx.Provider value={{ db, set, up, go, notify, ext, refreshExt, eventsFor, fsync }}>
+    <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
+      <aside className="hidden lg:flex flex-col gap-1 sticky top-0 h-screen border-r border-line bg-surface p-4">
+        <div className="px-1 pb-4"><Brand /></div>
+        <nav className="flex flex-col gap-0.5" aria-label="Moduler">{NAV.map(n => <button key={n.id} className="navbtn" aria-current={tab === n.id ? 'page' : undefined} onClick={() => go(n.id)}><Icon name={n.icon} size={19} />{n.label}</button>)}</nav>
+        <span className="flex-1" />
+        <button className="navbtn" onClick={() => setShare(true)}><Icon name="cloud" size={19} /><span className="flex-1">{shareLabel}</span><Dot color={shareDot} size={9} /></button>
+        <button className="navbtn" onClick={() => setFam(true)}><Icon name="users" size={19} />Familie</button>
+        <button className="navbtn" onClick={toggleTheme}><Icon name={isDark ? 'sun' : 'moon'} size={19} />{isDark ? 'Lyst tema' : 'Mørkt tema'}</button>
+      </aside>
+      <div className="min-w-0">
+        <header className="lg:hidden sticky z-30 flex items-center justify-between gap-2 px-4 py-2.5 bg-surface border-b border-line" style={{ top:'env(safe-area-inset-top, 0px)' }}>
+          <Brand />
+          <span className="flex items-center"><button className="iconbtn relative" aria-label={shareLabel} onClick={() => setShare(true)}><Icon name="cloud" /><span className="absolute top-1.5 right-1.5"><Dot color={shareDot} size={8} /></span></button>
+            <button className="iconbtn" aria-label="Familie" onClick={() => setFam(true)}><Icon name="users" /></button>
+            <button className="iconbtn" aria-label="Skift tema" onClick={toggleTheme}><Icon name={isDark ? 'sun' : 'moon'} /></button></span>
+        </header>
+        <main className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-10 pt-5 pb-28 lg:pb-12">
+          {db.demo && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-accentsoft text-ink px-4 py-2.5 mb-5 text-sm">
+            <span className="flex items-center gap-2"><Icon name="sparkles" size={16} className="text-accent" />Du ser eksempeldata. Ret frit i det, eller ryd alt og start forfra.</span>
+            <button className="btn btn-sm" onClick={clearDemo}>Ryd eksempeldata</button></div>}
+          <View />
+        </main>
+      </div>
+    </div>
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-line flex overflow-x-auto noscroll gap-1 px-2 pt-1.5" style={{ paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 6px)' }} aria-label="Moduler">
+      {NAV.map(n => <button key={n.id} className="tabbtn" aria-current={tab === n.id ? 'page' : undefined} onClick={() => go(n.id)}><Icon name={n.icon} size={20} />{n.label}</button>)}
+    </nav>
+    {toast && <div className="pop fixed z-[60] left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-ink text-canvas px-4 py-2.5 text-sm shadow-xl max-w-[92vw]" style={{ bottom:'calc(env(safe-area-inset-bottom, 0px) + 84px)' }} role="status">
+      <span>{toast.msg}</span>{toast.action && <button className="font-semibold underline" onClick={() => { toast.action.fn(); setToast(null); }}>{toast.action.label}</button>}</div>}
+    {fam && <FamilyModal onClose={() => setFam(false)} />}
+    {share && <ShareModal onClose={() => setShare(false)} />}
+  </Ctx.Provider>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
