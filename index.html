@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Familieplanlægger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,6 +74,14 @@ body{background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,-apple-
 @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 .pop{animation:pop .18s ease-out}
 </style>
+<style>
+:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+</style>
+</head>
+<body>
 <div id="root"></div>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script>
@@ -124,7 +136,9 @@ const ICONS = {
   sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
   repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
-  loader:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>'
+  loader:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>'
 };
 function Icon({ name, size = 18, sw = 1.8, className = '' }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw}
@@ -255,7 +269,7 @@ const FRESH_MEMBERS = [
 ];
 function emptyDb() {
   return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], dealsCheckedAt:null,
-    meals:{}, recipes:[], sessions:[], goals:[], tasks:[], ledger:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    meals:{}, recipes:[], feedMap:{}, feedHidden:{}, sessions:[], goals:[], tasks:[], ledger:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
 }
 function seedDb() {
@@ -447,9 +461,9 @@ function Check({ done, onClick, label }) {
 }
 /* ---------- Overblik ---------- */
 function Overblik() {
-  const { db, go } = useApp();
+  const { db, go, eventsFor } = useApp();
   const now = new Date(); const today = iso(now); const di = dayIdx(now);
-  const evs = db.events.filter(e => e.date === today).sort(byTime);
+  const evs = eventsFor(today).sort(byTime);
   const trains = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
   const meal = db.meals[today];
   const nextBd = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(now)) })).sort((a, b) => a.days - b.days)[0];
@@ -527,14 +541,14 @@ function EventModal({ init, onClose }) {
 }
 
 function Kalender() {
-  const { db, set } = useApp();
+  const { db, set, eventsFor, ext } = useApp();
   const ui = db.ui; const setUi = p => set('ui', u => ({ ...u, ...p }));
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [sel, setSel] = useState(() => iso(startOfDay(new Date())));
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(null); const [extEv, setExtEv] = useState(null); const [sync, setSync] = useState(false);
   const today = iso(new Date()); const filter = ui.calFilter; const view = ui.calView;
   const vis = e => filter === 'all' || e.member === filter || e.member === 'all';
-  const eventsOn = k => db.events.filter(e => e.date === k && vis(e)).sort(byTime);
+  const eventsOn = k => eventsFor(k).filter(vis).sort(byTime);
   const trainOn = k => ui.showTraining ? db.sessions.filter(s => s.day === dayIdx(parse(k)) && (filter === 'all' || s.member === filter)).sort((a, b) => a.start.localeCompare(b.start)) : [];
   const newEv = date => setModal({ title:'', date, start:'', end:'', member:filter === 'all' ? 'all' : filter, note:'' });
   const shift = n => setCursor(c => view === 'month' ? new Date(c.getFullYear(), c.getMonth() + n, 1) : addDays(c, 7 * n));
@@ -548,9 +562,9 @@ function Kalender() {
   const title = view === 'month' ? `${MONTHS[cursor.getMonth()][0].toUpperCase() + MONTHS[cursor.getMonth()].slice(1)} ${cursor.getFullYear()}`
     : `Uge ${isoWeek(ws)} · ${fmtShort(ws)} til ${fmtShort(addDays(ws, 6))}`;
 
-  const EventRow = ({ e }) => <button className="w-full text-left flex items-center gap-2 rounded-lg px-2.5 py-2 hover:brightness-95" style={{ background:soft(memberFor(db, e.member).color) }} onClick={() => setModal(e)}>
+  const EventRow = ({ e }) => <button className="w-full text-left flex items-center gap-2 rounded-lg px-2.5 py-2 hover:brightness-95" style={{ background:soft(memberFor(db, e.member).color) }} onClick={() => e.ext ? setExtEv(e) : setModal(e)}>
     <span className="tnum text-xs text-muted w-[84px] shrink-0">{e.start ? e.start + (e.end ? '–' + e.end : '') : 'Hele dagen'}</span>
-    <span className="font-semibold text-sm truncate flex-1">{e.title}</span><Dot color={memberFor(db, e.member).color} /></button>;
+    <span className="font-semibold text-sm truncate flex-1">{e.title}</span>{e.ext && <Icon name="cloud" size={13} className="text-muted" />}<Dot color={memberFor(db, e.member).color} /></button>;
   const TrainRow = ({ s }) => <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 border border-dashed border-line text-sm text-muted">
     <span className="tnum text-xs w-[84px] shrink-0">{s.start}–{fromMin(toMin(s.start) + s.duration)}</span>
     <Icon name="dumbbell" size={14} /><span className="truncate flex-1">{s.activity}, {memberFor(db, s.member).name}</span></div>;
@@ -561,6 +575,7 @@ function Kalender() {
 
   return <div>
     <PageHead icon="calendar" title="Fælles kalender" sub="Alles aftaler samlet ét sted">
+      <button className="btn" onClick={() => setSync(true)}><Icon name="refresh" size={16} className={ext.status === 'loading' ? 'animate-spin' : ''} />Synk</button>
       <button className="btn btn-primary" onClick={() => newEv(sel)}><Icon name="plus" size={16} />Ny aftale</button>
     </PageHead>
     {soon.length > 0 && <div className="flex items-start gap-3 rounded-xl bg-warnsoft px-4 py-3 mb-4 text-sm">
@@ -629,7 +644,56 @@ function Kalender() {
       </aside>
     </div>
     {modal && <EventModal init={modal} onClose={() => setModal(null)} />}
+    {extEv && <ExtEventModal e={extEv} onClose={() => setExtEv(null)} />}
+    {sync && <SyncModal onClose={() => setSync(false)} />}
   </div>;
+}
+/* ---------- Eksterne kalendere (read-only) ---------- */
+const EXT_KEY = 'familieplanlaegger.ext.v1';
+
+function ExtEventModal({ e, onClose }) {
+  const when = e.allDay || !e.start ? 'Hele dagen' : e.start + (e.end ? ' til ' + e.end : '');
+  return <Modal title={e.title} onClose={onClose}>
+    <div className="px-5 py-4 flex flex-col gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2"><Who id={e.member} /><span className="inline-flex items-center gap-1.5 text-muted"><Icon name="cloud" size={14} />{e.feedName}</span></div>
+      <p className="tnum"><b className="font-semibold">{fmtLong(parse(e.date))}</b>, {when}</p>
+      {e.location && <p className="flex items-center gap-2 text-muted"><Icon name="pinmap" size={15} />{e.location}</p>}
+      {e.note && <p className="whitespace-pre-wrap text-muted">{e.note}</p>}
+      <p className="text-xs text-muted rounded-lg bg-surface2 px-3 py-2">Denne aftale kommer fra en ekstern kalender. Ret den i kilden, så opdateres den her ved næste synkronisering.</p>
+      <button type="button" className="btn btn-primary self-end" onClick={onClose}>Luk</button>
+    </div>
+  </Modal>;
+}
+
+function SyncModal({ onClose }) {
+  const { db, set, ext, refreshExt } = useApp();
+  const feeds = (ext.data && ext.data.feeds) || [];
+  const gen = ext.data && ext.data.generated ? new Date(ext.data.generated) : null;
+  const when = d => d.toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const map = db.feedMap || {}; const hidden = db.feedHidden || {};
+  return <Modal title="Kalendersynkronisering" onClose={onClose}>
+    <div className="px-5 py-4 flex flex-col gap-4">
+      {feeds.length === 0 ? <div className="flex flex-col gap-2 text-sm">
+        <p className="font-semibold">Ingen eksterne kalendere endnu</p>
+        <p className="text-muted">{ext.status === 'loading' ? 'Henter data ...' : 'Synkroniseringen kører som en GitHub Action og lægger kalenderdata ved siden af appen. Følg README for at sætte den op. Når den har kørt første gang, dukker dine kalendere op her.'}</p>
+      </div> : <>
+        <p className="text-sm text-muted">Vælg hvem hver kalender hører til. Aftalerne får personens farve og følger kalenderens filter.</p>
+        {feeds.map(f => <section key={f.id} className="rounded-xl border border-line p-3 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold min-w-0 truncate">{f.name}</p>
+            <span className="text-xs text-muted tnum shrink-0">{f.count} {f.count === 1 ? 'aftale' : 'aftaler'}</span></div>
+          {f.error && <p className="text-xs rounded-lg bg-warnsoft text-warn px-2.5 py-1.5">{f.error}</p>}
+          <div><span className="lbl">Tilhører</span><MemberPick all value={map[f.id] || f.member || 'all'} onChange={v => set('feedMap', m => ({ ...(m || {}), [f.id]:v }))} /></div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!hidden[f.id]} onChange={e => set('feedHidden', h => ({ ...(h || {}), [f.id]:!e.target.checked }))} />Vis i kalenderen</label>
+        </section>)}
+      </>}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+        <span className="tnum">{gen ? `Kilderne blev sidst hentet ${when(gen)}` : 'Ikke hentet endnu'}</span>
+        <button type="button" className="btn btn-sm" onClick={refreshExt} disabled={ext.status === 'loading'}><Icon name="refresh" size={14} className={ext.status === 'loading' ? 'animate-spin' : ''} />Opdatér nu</button>
+      </div>
+      <p className="text-xs text-muted">Appen henter nye data hvert 10. minut og når du vender tilbage til fanen. Selve kalenderne hentes af GitHub Action'en, som standard hver halve time.</p>
+    </div>
+  </Modal>;
 }
 /* ---------- Fødselsdage ---------- */
 function BirthdayModal({ init, onClose }) {
@@ -1190,6 +1254,41 @@ function App() {
   const [db, setDb] = useState(loadDb);
   const [toast, setToast] = useState(null); const [fam, setFam] = useState(false);
   const toastTimer = useRef(null);
+  const [ext, setExt] = useState(() => {
+    try { const r = localStorage.getItem(EXT_KEY); if (r) return { status:'cached', data:JSON.parse(r), checked:null }; } catch (e) {}
+    return { status:'idle', data:null, checked:null };
+  });
+  const refreshExt = async () => {
+    setExt(x => ({ ...x, status:'loading' }));
+    try {
+      const res = await fetch('data/calendar-events.json?t=' + Date.now(), { cache:'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data || !Array.isArray(data.events)) throw new Error('Ugyldigt format');
+      try { localStorage.setItem(EXT_KEY, JSON.stringify(data)); } catch (e) {}
+      setExt({ status:'ok', data, checked:new Date() });
+    } catch (e) { setExt(x => ({ status:x.data ? 'cached' : 'none', data:x.data, checked:new Date() })); }
+  };
+  useEffect(() => {
+    refreshExt();
+    const t = setInterval(refreshExt, 10 * 60 * 1000);
+    const vis = () => { if (document.visibilityState === 'visible') refreshExt(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, []);
+  const extByDate = useMemo(() => {
+    const m = {}; if (!ext.data) return m;
+    const hidden = db.feedHidden || {}; const fm = db.feedMap || {}; const feeds = {};
+    (ext.data.feeds || []).forEach(f => { feeds[f.id] = f; });
+    ext.data.events.forEach(e => {
+      if (hidden[e.feed]) return;
+      const f = feeds[e.feed] || {};
+      (m[e.date] = m[e.date] || []).push({ id:'x:' + e.id, ext:true, title:e.title, date:e.date, start:e.start || '', end:e.end || '',
+        member:fm[e.feed] || f.member || 'all', feedName:f.name || e.feed, location:e.location || '', note:e.desc || '', allDay:!!e.allDay });
+    });
+    return m;
+  }, [ext.data, db.feedMap, db.feedHidden]);
+  const eventsFor = k => [...db.events.filter(e => e.date === k), ...(extByDate[k] || [])];
   useEffect(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) {} }, [db]);
   useEffect(() => {
     const r = document.documentElement;
@@ -1199,14 +1298,14 @@ function App() {
   const up = fn => setDb(d => fn(d));
   const go = tab => { set('ui', u => ({ ...u, tab })); window.scrollTo(0, 0); };
   const notify = (msg, action) => { setToast({ msg, action }); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 4200); };
-  const clearDemo = () => setDb(d => ({ ...emptyDb(), members:d.members, ui:d.ui }));
+  const clearDemo = () => setDb(d => ({ ...emptyDb(), members:d.members, ui:d.ui, feedMap:d.feedMap || {}, feedHidden:d.feedHidden || {} }));
   const tab = VIEWS[db.ui.tab] ? db.ui.tab : 'overblik'; const View = VIEWS[tab];
   const isDark = db.ui.theme === 'dark' || (db.ui.theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const toggleTheme = () => set('ui', u => ({ ...u, theme:isDark ? 'light' : 'dark' }));
   const Brand = () => <div className="flex items-center gap-2.5 min-w-0">
     <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-accent text-accentink shrink-0"><Icon name="home" size={19} /></span>
     <span className="min-w-0"><span className="block font-display font-semibold leading-tight">Familieplanlægger</span><span className="block text-xs text-muted tnum">Uge {isoWeek(new Date())}</span></span></div>;
-  return <Ctx.Provider value={{ db, set, up, go, notify }}>
+  return <Ctx.Provider value={{ db, set, up, go, notify, ext, refreshExt, eventsFor }}>
     <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
       <aside className="hidden lg:flex flex-col gap-1 sticky top-0 h-screen border-r border-line bg-surface p-4">
         <div className="px-1 pb-4"><Brand /></div>
@@ -1239,5 +1338,5 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
-
-</body></html>
+</body>
+</html>
