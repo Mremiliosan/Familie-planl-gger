@@ -1,8 +1,8 @@
 {
-  "apiKey": "",
-  "authDomain": "",
-  "projectId": "",
-  "storageBucket": "",
-  "messagingSenderId": "",
-  "appId": ""
+  "apiKey": "AIzaSyBCL9fLKz4q6Q6rGCYU-QPyDPSI6SZp5mA",
+  "authDomain": "familie-planlagger.firebaseapp.com",
+  "projectId": "familie-planlagger",
+  "storageBucket": "familie-planlagger.firebasestorage.app",
+  "messagingSenderId": "809937027382",
+  "appId": "1:809937027382:web:b12fb301fb4e4c87d27397"
 }
