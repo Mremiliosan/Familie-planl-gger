@@ -1701,7 +1701,7 @@ function MealModal({ date, init, onClose }) {
   const [cook, setCook] = useState(init ? init.cook : '');
   const [ings, setIngs] = useState(init ? init.ingredients : []);
   const [touched, setTouched] = useState(!!(init && init.ingredients && init.ingredients.length));
-  const [auto, setAuto] = useState(''); const [save, setSave] = useState(false); const [newIng, setNewIng] = useState('');
+  const [to, setTo] = useState(date); const [auto, setAuto] = useState(''); const [save, setSave] = useState(false); const [newIng, setNewIng] = useState('');
   const sugg = useMemo(() => searchRecipes(db.recipes, dish, 5).filter(r => normName(r.name) !== normName(dish)), [dish, db.recipes]);
   const onDish = v => {
     setDish(v); if (touched) return;
@@ -1715,15 +1715,18 @@ function MealModal({ date, init, onClose }) {
     const name = dish.trim(); let list = ings.map(x => x.trim()).filter(Boolean);
     if (newIng.trim()) list = [...list, newIng.trim()];
     if (!name) { set('meals', m => { const n = { ...m }; delete n[date]; return n; }); onClose(); return; }
-    set('meals', m => ({ ...m, [date]:{ dish:name, cook, ingredients:list, transferred:!!transfer } }));
+    set('meals', m => { const n = { ...m }; if (to !== date) delete n[date]; n[to] = { dish:name, cook, ingredients:list, transferred:!!transfer || (to === date && !!(init && init.transferred)) }; return n; });
     if (save && !db.recipes.some(r => normName(r.name) === normName(name))) set('recipes', l => [...l, { id:uid(), name, ingredients:list }]);
     if (transfer) { const { list:sl, added, skipped } = addToShopping(db.shopping, list, db.pantry); set('shopping', sl); notify(shopMsg(added, skipped), { label:'Se listen', fn:() => go('indkoeb') }); }
     onClose();
   };
-  return <FormModal title={`Madplan, ${fmtLong(parse(date)).toLowerCase()}`} onClose={onClose} onSubmit={e => { e.preventDefault(); saveMeal(false); }}
+  const del = () => { const old = init; set('meals', mm => { const n = { ...mm }; delete n[date]; return n; }); onClose(); notify(`${old.dish} er fjernet`, { label:'Fortryd', fn:() => set('meals', mm => mm[date] ? mm : { ...mm, [date]:old }) }); };
+  const weekDays = Array.from({ length:7 }, (_, i) => addDays(startOfWeek(parse(date)), i));
+  return <FormModal title={`Madplan, ${fmtLong(parse(date)).toLowerCase()}`} onDelete={init && init.dish ? del : null} onClose={onClose} onSubmit={e => { e.preventDefault(); saveMeal(false); }}
     extra={ings.length > 0 ? <button type="button" className="btn" onClick={() => saveMeal(true)}><Icon name="cart" size={16} />Gem og overfør til indkøb</button> : null}>
     <div><Field label="Ret"><input className="field" autoFocus value={dish} onChange={e => onDish(e.target.value)} placeholder="Fx lasagne" autoComplete="off" /></Field>
       {sugg.length > 0 && <div className="flex flex-wrap gap-1.5 mt-2">{sugg.map(r => <button type="button" key={r.name} className="chip" onClick={() => pick(r)}><Icon name="search" size={13} />{r.name}</button>)}</div>}</div>
+    {init && init.dish && <Field label="Dag"><select className="field" value={to} onChange={e => setTo(e.target.value)}>{weekDays.map(d => { const k = iso(d); const o = db.meals[k]; return <option key={k} value={k}>{DAYS[dayIdx(d)]} {fmtShort(d)}{k !== date && o && o.dish ? ` (erstatter ${o.dish})` : ''}</option>; })}</select></Field>}
     <div><span className="lbl">Kokketjans</span><MemberPick all none="Ikke fordelt" value={cook} onChange={setCook} /></div>
     <div>
       <span className="lbl">Ingredienser</span>
@@ -1798,6 +1801,7 @@ function Madplan() {
           </button>
           <div className="flex items-center gap-1">
             {m && m.dish && m.ingredients.length > 0 && <button className="btn btn-sm" onClick={() => transfer([k])} title="Overfør ingredienser til indkøbslisten"><Icon name="cart" size={14} />Overfør</button>}
+            {m && m.dish && <button className="iconbtn" aria-label={`Fjern ${m.dish}`} title="Fjern retten" onClick={() => { const old = m; set('meals', mm => { const n = { ...mm }; delete n[k]; return n; }); notify(`${old.dish} er fjernet`, { label:'Fortryd', fn:() => set('meals', mm => mm[k] ? mm : { ...mm, [k]:old }) }); }}><Icon name="trash" size={16} /></button>}
             <button className="iconbtn" aria-label={`Redigér ${DAYS[dayIdx(d)]}`} onClick={() => setEdit(k)}><Icon name="pencil" size={16} /></button>
           </div>
         </div>; })}
