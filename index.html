@@ -917,41 +917,45 @@ function Check({ done, onClick, label }) {
 /* ---------- Madpakketjans (søndag til torsdag) ---------- */
 const PACK_DAYS = [6, 0, 1, 2, 3];
 const isPackDay = d => PACK_DAYS.includes(dayIdx(d));
-const packWho = (db, k) => { const pd = db.packDuty || {}; const sw = (pd.swaps || {})[k]; if (sw) return sw; return (pd.plan || {})[dayIdx(parse(k))] || ''; };
+const toList = v => Array.isArray(v) ? v : (v ? [v] : []);
+const packWho = (db, k) => { const pd = db.packDuty || {}; const sw = toList((pd.swaps || {})[k]); if (sw.length) return sw; return toList((pd.plan || {})[dayIdx(parse(k))]); };
 function PackModal({ onClose }) {
   const { db, set } = useApp();
   const pd = db.packDuty || {};
-  const [plan, setPlan] = useState({ ...(pd.plan || {}) });
-  const [swaps, setSwaps] = useState({ ...(pd.swaps || {}) });
+  const norm = o => { const r = {}; Object.keys(o || {}).forEach(k => { r[k] = toList(o[k]); }); return r; };
+  const [plan, setPlan] = useState(norm(pd.plan));
+  const [swaps, setSwaps] = useState(norm(pd.swaps));
   const t0 = startOfDay(new Date());
   const next = Array.from({ length:14 }, (_, i) => addDays(t0, i)).filter(isPackDay).slice(0, 7);
   const submit = e => {
     e.preventDefault();
-    const today = iso(t0); const sw = {}; Object.keys(swaps).forEach(k => { if (swaps[k] && k >= today) sw[k] = swaps[k]; });
+    const today = iso(t0); const sw = {}; Object.keys(swaps).forEach(k => { if (swaps[k].length && k >= today) sw[k] = swaps[k]; });
     set('packDuty', { plan, swaps:sw }); onClose();
   };
   return <FormModal title="Madpakketjans" onClose={onClose} onSubmit={submit}>
     <div><span className="lbl">Fast ugeplan</span>
       <div className="flex flex-col gap-3">{PACK_DAYS.map(i => <div key={i}><p className="text-sm font-semibold mb-1.5">{DAYS[i]}</p>
-        <MemberPick value={plan[i] || ''} none="Ikke fordelt" onChange={v => setPlan(p => ({ ...p, [i]:v }))} /></div>)}</div></div>
+        <MemberPick multi value={plan[i] || []} onChange={v => setPlan(p => ({ ...p, [i]:v }))} /></div>)}</div>
+      <p className="text-xs text-muted mt-2">Vælg en eller flere ved at trykke på dem. Ingen valgt betyder "ikke fordelt".</p></div>
     <div><span className="lbl">Byt rundt de næste dage</span>
-      <p className="text-xs text-muted mb-2">Vælg en anden person for en enkelt dag. Den faste plan ændres ikke.</p>
-      <div className="flex flex-col gap-3">{next.map(d => { const k = iso(d); const fixed = (plan[dayIdx(d)] || '');
-        return <div key={k}><p className="text-sm font-semibold mb-1.5">{DAYS[dayIdx(d)]} {fmtShort(d)} <span className="text-muted font-normal">{fixed ? `· fast: ${memberFor(db, fixed).name}` : ''}</span></p>
-          <MemberPick value={swaps[k] || ''} none="Som fast plan" onChange={v => setSwaps(s => ({ ...s, [k]:v }))} /></div>; })}</div></div>
+      <p className="text-xs text-muted mb-2">Vælg andre personer for en enkelt dag. Den faste plan ændres ikke.</p>
+      <div className="flex flex-col gap-3">{next.map(d => { const k = iso(d); const fixed = (plan[dayIdx(d)] || []);
+        return <div key={k}><p className="text-sm font-semibold mb-1.5">{DAYS[dayIdx(d)]} {fmtShort(d)} <span className="text-muted font-normal">{fixed.length ? `· fast: ${fixed.map(id => memberFor(db, id).name).join(', ')}` : ''}</span></p>
+          <MemberPick multi value={swaps[k] || []} onChange={v => setSwaps(s => ({ ...s, [k]:v }))} /></div>; })}</div>
+      <p className="text-xs text-muted mt-2">Ingen valgt betyder, at den faste plan gælder.</p></div>
   </FormModal>;
 }
 function PackBlock({ onOpen }) {
   const { db } = useApp();
   const now = new Date(); if (!isPackDay(now)) return null;
-  const k = iso(now); const who = packWho(db, k); const swapped = !!((db.packDuty || {}).swaps || {})[k];
+  const k = iso(now); const who = packWho(db, k); const swapped = toList(((db.packDuty || {}).swaps || {})[k]).length > 0;
   return <div className="rounded-2xl px-3.5 py-3 flex items-center gap-3" style={{ background:'var(--t-mint)' }}>
     <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-surface shrink-0"><Icon name="utensils" size={17} className="text-goodink" /></span>
     <div className="min-w-0 flex-1">
       <p className="text-xs font-bold uppercase tracking-wider text-muted">Madpakker i dag</p>
-      <p className="font-semibold flex items-center gap-2 flex-wrap">{who ? <Who id={who} /> : <span className="text-muted font-medium">Ikke fordelt</span>}{swapped && <span className="text-xs text-muted font-medium">byttet</span>}</p>
+      <p className="font-semibold flex items-center gap-2 flex-wrap">{who.length ? <Who ids={who} /> : <span className="text-muted font-medium">Ikke fordelt</span>}{swapped && <span className="text-xs text-muted font-medium">byttet</span>}</p>
     </div>
-    <button className="btn btn-sm shrink-0" onClick={onOpen}>{who ? 'Byt' : 'Vælg'}</button>
+    <button className="btn btn-sm shrink-0" onClick={onOpen}>{who.length ? 'Byt' : 'Vælg'}</button>
   </div>;
 }
 
