@@ -201,19 +201,20 @@ const fromMin = n => `${pad(Math.floor(n / 60) % 24)}:${pad(n % 60)}`;
 const byTime = (a, b) => (a.start || '').localeCompare(b.start || '');
 const num = n => Number(n).toLocaleString('da-DK', { maximumFractionDigits: 2 });
 
-function nextBirthday(dateStr, today) {
+function nextBirthday(dateStr, today, noYear) {
   const b = parse(dateStr), m = b.getMonth(), dd = b.getDate();
   const mk = y => { let d = new Date(y, m, dd); if (m === 1 && dd === 29 && d.getMonth() !== 1) d = new Date(y, 1, 28); return d; };
   let n = mk(today.getFullYear());
   if (n < today) n = mk(today.getFullYear() + 1);
   const days = Math.round((n - today) / 86400000);
   const turning = n.getFullYear() - b.getFullYear();
-  return { date: n, days, turning, age: days === 0 ? turning : turning - 1 };
+  const hide = !!noYear || turning < 1;
+  return { date: n, days, turning: hide ? null : turning, age: hide ? null : (days === 0 ? turning : turning - 1), noYear: hide };
 }
 function birthdaysOn(list, date) {
   return list.filter(b => {
     const x = parse(b.date), y = date.getFullYear();
-    if (y < x.getFullYear()) return false;
+    if (!b.noYear && y < x.getFullYear()) return false;
     let m = x.getMonth(), d = x.getDate();
     if (m === 1 && d === 29 && !isLeap(y)) d = 28;
     return date.getMonth() === m && date.getDate() === d;
@@ -371,6 +372,18 @@ Grøntsagslasagne|Lasagneplader,Squash,Aubergine,Hakkede tomater på dåse,Løg,
 `.trim().split('\n').map(l => { const [name, ing] = l.split('|'); return { name, ingredients: ing.split(',').map(x => x.trim()), builtin: true }; });
 
 const normName = s => (s || '').toLowerCase().replace(/[^a-zæøå0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+/* lager: er ingrediensen på lager? */
+function inPantry(pantry, ing) {
+  const a = normName(ing); if (!a) return null;
+  const at = a.split(' ');
+  return (pantry || []).find(p => {
+    const b = normName(p.name); if (!b) return false;
+    if (a === b) return true;
+    const bt = b.split(' ');
+    if (bt.every(w => at.includes(w)) || at.every(w => bt.includes(w))) return true;
+    return at.length === 1 && bt.length === 1 && Math.min(a.length, b.length) >= 4 && (a.endsWith(b) || b.endsWith(a));
+  }) || null;
+}
 function allRecipes(saved) {
   const mine = (saved || []).map(r => ({ ...r, builtin: false }));
   const names = new Set(mine.map(r => normName(r.name)));
@@ -654,7 +667,7 @@ const FRESH_MEMBERS = [
 const OLD_COLORS = { '#4F7CAC':'#5BB6D6', '#C0697B':'#EE8FB3', '#4E9A78':'#6FCBA3', '#D09A33':'#F3BE4F' };
 const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7B', '#7AA7F0', '#B7C95A'];
 function emptyDb() {
-  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], dealsCheckedAt:null,
+  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
     sessions:[], goals:[], tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
@@ -866,7 +879,7 @@ function Overblik() {
   const trains = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
   const upcoming = Array.from({ length:7 }, (_, i) => iso(addDays(t0, i + 1))).flatMap(k => eventsFor(k).sort(byTime).map(e => ({ ...e, dk:k }))).slice(0, 4);
   const meal = db.meals[today];
-  const bds = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0) })).sort((a, b) => a.days - b.days).slice(0, 3);
+  const bds = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0, b.noYear) })).sort((a, b) => a.days - b.days).slice(0, 3);
   const openTasks = db.tasks.filter(t => t.status !== 'done');
   const left = db.shopping.filter(i => !i.done);
   const pinned = db.notes.filter(n => n.pinned);
@@ -934,7 +947,7 @@ function Overblik() {
 
 /* ---------- Kalender ---------- */
 function EventModal({ init, onClose }) {
-  const { set } = useApp();
+  const { set, notify } = useApp();
   const [f, setF] = useState({ repeat:'none', until:'', skip:[], ...init, members:memsOf(init).length ? memsOf(init) : ['all'] });
   const u = (k, v) => setF(p => ({ ...p, [k]:v }));
   const clean = () => { const { occ, ...rest } = f; const mems = f.members.length ? f.members : ['all']; return { ...rest, title:f.title.trim(), members:mems, member:mems[0], until:f.repeat === 'none' ? '' : f.until }; };
@@ -944,7 +957,7 @@ function EventModal({ init, onClose }) {
     if (ev.id) set('events', l => l.map(x => x.id === ev.id ? ev : x)); else set('events', l => [...l, { ...ev, id:uid() }]);
     onClose();
   };
-  const del = () => { set('events', l => l.filter(x => x.id !== f.id)); onClose(); };
+  const del = () => { const old = { ...init }; delete old.occ; set('events', l => l.filter(x => x.id !== f.id)); onClose(); notify(`"${old.title}" er slettet`, { label:'Fortryd', fn:() => set('events', l => l.some(x => x.id === old.id) ? l : [...l, old]) }); };
   const skipDay = () => { set('events', l => l.map(x => x.id === f.id ? { ...x, skip:[...(x.skip || []), f.occ] } : x)); onClose(); };
   const rep = f.repeat !== 'none';
   return <FormModal title={f.id ? (rep ? 'Redigér fast aftale' : 'Redigér aftale') : 'Ny aftale'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}
@@ -967,7 +980,7 @@ function EventModal({ init, onClose }) {
 }
 
 function Kalender() {
-  const { db, set, eventsFor, ext, openSettings } = useApp();
+  const { db, set, notify, go, eventsFor, ext, openSettings } = useApp();
   const ui = db.ui; const setUi = p => set('ui', u => ({ ...u, ...p }));
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [sel, setSel] = useState(() => iso(startOfDay(new Date())));
@@ -978,7 +991,7 @@ function Kalender() {
   const newEv = date => setModal({ title:'', date, start:'', end:'', members:filter === 'all' ? ['all'] : [filter], note:'', repeat:'none' });
   const openEv = e => { if (e.ext) { setExtEv(e); return; } const base = db.events.find(x => x.id === e.id); if (base) setModal({ ...base, occ:e.date }); };
   const shift = n => setCursor(c => view === 'month' ? new Date(c.getFullYear(), c.getMonth() + n, 1) : addDays(c, 7 * n));
-  const soon = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(new Date())) })).filter(x => x.days <= 7).sort((a, b) => a.days - b.days);
+  const soon = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(new Date()), b.noYear) })).filter(x => x.days <= 7).sort((a, b) => a.days - b.days);
 
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const dim = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
@@ -988,14 +1001,16 @@ function Kalender() {
   const title = view === 'month' ? `${MONTHS[cursor.getMonth()][0].toUpperCase() + MONTHS[cursor.getMonth()].slice(1)} ${cursor.getFullYear()}`
     : `Uge ${isoWeek(ws)} · ${fmtShort(ws)} til ${fmtShort(addDays(ws, 6))}`;
 
-  const EventRow = ({ e }) => <button className="w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 hover:brightness-95" style={{ background:evBg(db, e.members) }} onClick={() => openEv(e)}>
+  const delEv = e => { const old = db.events.find(x => x.id === e.id); if (!old) return; set('events', l => l.filter(x => x.id !== old.id)); notify(`"${old.title}" er slettet`, { label:'Fortryd', fn:() => set('events', l => l.some(x => x.id === old.id) ? l : [...l, old]) }); };
+  const EventRow = ({ e }) => <div className="flex items-center gap-1" style={{ background:evBg(db, e.members), borderRadius:12 }}><button className="flex-1 min-w-0 text-left flex items-center gap-2 rounded-xl px-3 py-2 hover:brightness-95" onClick={() => openEv(e)}>
     <span className="tnum text-xs text-muted w-[84px] shrink-0">{e.start ? e.start + (e.end ? '–' + e.end : '') : 'Hele dagen'}</span>
-    <span className="font-semibold text-sm truncate flex-1">{e.title}</span>{e.repeat && e.repeat !== 'none' && <Icon name="repeat" size={13} className="text-muted" />}{e.ext && <Icon name="cloud" size={13} className="text-muted" />}<PersonDots ids={e.members} /></button>;
+    <span className="font-semibold text-sm truncate flex-1">{e.title}</span>{e.repeat && e.repeat !== 'none' && <Icon name="repeat" size={13} className="text-muted" />}{e.ext && <Icon name="cloud" size={13} className="text-muted" />}<PersonDots ids={e.members} /></button>
+    {!e.ext && <button className="iconbtn" aria-label={`Slet ${e.title}`} title={e.repeat && e.repeat !== 'none' ? 'Slet hele den faste aftale' : 'Slet aftale'} onClick={() => delEv(e)}><Icon name="trash" size={16} /></button>}</div>;
   const TrainRow = ({ s }) => <div className="flex items-center gap-2 rounded-xl px-3 py-2 border border-dashed border-line text-sm text-muted">
     <span className="tnum text-xs w-[84px] shrink-0">{s.start}–{fromMin(toMin(s.start) + s.duration)}</span>
     <Icon name="dumbbell" size={14} /><span className="truncate flex-1">{s.activity}, {memberFor(db, s.member).name}</span></div>;
-  const BdRow = ({ b }) => <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-ink" style={{ background:'var(--t-sun)' }}>
-    <Icon name="cake" size={16} className="text-warn" />{b.name}{b.kind === 'mærkedag' ? ` · ${new Date().getFullYear() - parse(b.date).getFullYear()} år` : ''}</div>;
+  const BdRow = ({ b }) => <button type="button" onClick={() => go('foedselsdage')} className="w-full text-left flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-ink" style={{ background:'var(--t-sun)' }}>
+    <Icon name="cake" size={16} className="text-warn" />{b.name}{b.kind === 'mærkedag' && !b.noYear ? ` · ${new Date().getFullYear() - parse(b.date).getFullYear()} år` : ''}</button>;
 
   const selDate = parse(sel); const selEvents = eventsOn(sel); const selTrain = trainOn(sel); const selBd = birthdaysOn(db.birthdays, selDate); const selMeal = db.meals[sel];
 
@@ -1398,58 +1413,81 @@ function ShareModal({ onClose }) {
 
 /* ---------- Fødselsdage ---------- */
 function BirthdayModal({ init, onClose }) {
-  const { set } = useApp();
-  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const { set, notify } = useApp();
+  const d0 = init.date ? parse(init.date) : null;
+  const [f, setF] = useState({ ...init });
+  const [day, setDay] = useState(d0 ? d0.getDate() : '');
+  const [mon, setMon] = useState(d0 ? d0.getMonth() + 1 : '');
+  const [yr, setYr] = useState(d0 && !init.noYear ? String(d0.getFullYear()) : '');
+  const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const MN = ['januar', 'februar', 'marts', 'april', 'maj', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'december'];
+  const yrOk = yr === '' || (/^\d{4}$/.test(yr) && +yr >= 1900 && +yr <= new Date().getFullYear() + 1);
   const submit = e => {
-    e.preventDefault(); if (!f.name.trim() || !f.date) return;
-    const b = { ...f, name:f.name.trim() };
+    e.preventDefault(); if (!f.name.trim() || !day || !mon || !yrOk) return;
+    const noYear = yr === ''; const y = noYear ? 2000 : +yr;
+    const date = `${y}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const b = { ...f, name:f.name.trim(), date, noYear };
     if (b.id) set('birthdays', l => l.map(x => x.id === b.id ? b : x)); else set('birthdays', l => [...l, { ...b, id:uid() }]);
     onClose();
   };
-  const del = () => { set('birthdays', l => l.filter(x => x.id !== f.id)); onClose(); };
+  const del = () => { const old = init; set('birthdays', l => l.filter(x => x.id !== f.id)); onClose(); notify(`${old.name} er slettet`, { label:'Fortryd', fn:() => set('birthdays', l => l.some(x => x.id === old.id) ? l : [...l, old]) }); };
+  const mk = f.kind === 'mærkedag';
   return <FormModal title={f.id ? 'Redigér dato' : 'Ny dato'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
     <Field label="Navn"><input className="field" autoFocus value={f.name} onChange={e => u('name', e.target.value)} placeholder="Fx Mormor" /></Field>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <Field label={f.kind === 'mærkedag' ? 'Startdato (første gang)' : 'Fødselsdato'}><input type="date" className="field" value={f.date} onChange={e => u('date', e.target.value)} required /></Field>
-      <Field label="Type"><select className="field" value={f.kind} onChange={e => u('kind', e.target.value)}><option value="fødselsdag">Fødselsdag</option><option value="mærkedag">Mærkedag (bryllup, jubilæum)</option></select></Field>
+    <Field label="Type"><select className="field" value={f.kind} onChange={e => u('kind', e.target.value)}><option value="fødselsdag">Fødselsdag</option><option value="mærkedag">Mærkedag (bryllup, jubilæum)</option></select></Field>
+    <div>
+      <span className="lbl">{mk ? 'Dato' : 'Fødselsdato'}</span>
+      <div className="grid grid-cols-[1fr_2fr_1.4fr] gap-2">
+        <select className="field" value={day} onChange={e => setDay(e.target.value)} required aria-label="Dag"><option value="">Dag</option>{Array.from({ length:31 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}</select>
+        <select className="field" value={mon} onChange={e => setMon(e.target.value)} required aria-label="Måned"><option value="">Måned</option>{MN.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
+        <input className="field" inputMode="numeric" maxLength={4} placeholder="Årstal (valgfri)" value={yr} onChange={e => setYr(e.target.value.replace(/\D/g, ''))} aria-label="Årstal (valgfri)" />
+      </div>
+      <p className="text-xs text-muted mt-1.5">Årstal er helt valgfrit. Kender du det ikke, så lad feltet stå tomt. Så vises der bare ingen alder.</p>
+      {!yrOk && <p className="text-xs text-danger mt-1">Skriv et årstal med 4 cifre, eller lad feltet være tomt.</p>}
     </div>
     <Field label="Gaveidé eller note"><input className="field" value={f.note} onChange={e => u('note', e.target.value)} /></Field>
   </FormModal>;
 }
 function Foedselsdage() {
-  const { db } = useApp();
+  const { db, set, notify } = useApp();
   const [modal, setModal] = useState(null);
+  const remove = b => { set('birthdays', l => l.filter(x => x.id !== b.id)); notify(`${b.name} er slettet`, { label:'Fortryd', fn:() => set('birthdays', l => l.some(x => x.id === b.id) ? l : [...l, b]) }); };
   const t0 = startOfDay(new Date());
-  const list = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0) })).sort((a, b) => a.days - b.days);
+  const list = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0, b.noYear) })).sort((a, b) => a.days - b.days);
   const hero = list[0]; const rest = list.slice(1);
-  const label = x => x.b.kind === 'mærkedag' ? `${x.turning} år` : `fylder ${x.turning}`;
+  const label = x => x.noYear ? (x.b.kind === 'mærkedag' ? 'mærkedag' : 'fødselsdag') : x.b.kind === 'mærkedag' ? `${x.turning} år` : `fylder ${x.turning}`;
   return <div>
     <PageHead icon="cake" title="Fødselsdage og mærkedage" sub="Nedtælling og alder, så ingen glemmes">
-      <button className="btn btn-primary" onClick={() => setModal({ name:'', date:'', kind:'fødselsdag', note:'' })}><Icon name="plus" size={16} />Tilføj dato</button>
+      <button className="btn btn-primary" onClick={() => setModal({ name:'', date:'', kind:'fødselsdag', note:'', noYear:false })}><Icon name="plus" size={16} />Tilføj dato</button>
     </PageHead>
     {!hero && <div className="card"><Empty icon="cake" text="Ingen datoer endnu. Tilføj den første fødselsdag." /></div>}
-    {hero && <div className="card p-5 sm:p-6 mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 justify-between">
+    {hero && <div role="button" tabIndex={0} onClick={() => setModal(hero.b)} onKeyDown={e => { if (e.key === 'Enter') setModal(hero.b); }} className="card p-5 sm:p-6 mb-4 cursor-pointer flex flex-wrap items-center gap-x-8 gap-y-3 justify-between">
       <div className="min-w-0">
         <p className="lbl">Næste</p>
         <h2 className="font-display text-3xl font-semibold leading-tight">{hero.b.name}</h2>
-        <p className="text-muted mt-1">{hero.b.kind === 'mærkedag' ? `Fejrer ${hero.turning} år` : `Fylder ${hero.turning} år`}, {fmtLong(hero.date).toLowerCase()}</p>
+        <p className="text-muted mt-1">{hero.noYear ? '' : (hero.b.kind === 'mærkedag' ? `Fejrer ${hero.turning} år, ` : `Fylder ${hero.turning} år, `)}{fmtLong(hero.date).toLowerCase()}</p>
+        <p className="text-xs text-muted mt-1">Tryk for at rette</p>
         {hero.b.note && <p className="mt-2 text-sm inline-flex items-center gap-1.5 rounded-full bg-warnsoft px-3 py-1"><Icon name="gift" size={14} className="text-warn" />{hero.b.note}</p>}
       </div>
       <div className="text-right">
+        <button type="button" className="btn btn-sm mb-2" aria-label={`Slet ${hero.b.name}`} onClick={e => { e.stopPropagation(); remove(hero.b); }}><Icon name="trash" size={14} />Slet</button>
         {hero.days === 0 ? <p className="font-display text-4xl font-semibold text-accent">I dag!</p> : <>
           <p className="font-display text-6xl font-semibold text-accent tnum leading-none">{hero.days}</p>
           <p className="text-muted mt-1">{hero.days === 1 ? 'dag til' : 'dage til'}</p></>}
       </div>
     </div>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {rest.map(x => <button key={x.b.id} onClick={() => setModal(x.b)} className="card p-4 text-left flex items-center gap-3 hover:bg-surface2 min-w-0">
+      {rest.map(x => <div key={x.b.id} className="card flex items-center min-w-0 hover:bg-surface2">
+        <button onClick={() => setModal(x.b)} className="p-4 pr-2 text-left flex items-center gap-3 min-w-0 flex-1">
         <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-accentsoft text-accent shrink-0"><Icon name={x.b.kind === 'mærkedag' ? 'gift' : 'cake'} /></span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold truncate">{x.b.name}</span>
-          <span className="block text-sm text-muted truncate">{label(x)}{x.b.kind === 'fødselsdag' ? ` · nu ${x.age} år` : ''} · {fmtShort(x.date)}</span>
+          <span className="block text-sm text-muted truncate">{label(x)}{x.b.kind === 'fødselsdag' && !x.noYear ? ` · nu ${x.age} år` : ''} · {fmtShort(x.date)}</span>
         </span>
         <span className="text-right shrink-0"><span className="block font-display text-xl font-semibold tnum">{x.days}</span><span className="block text-[11px] text-muted">{x.days === 1 ? 'dag' : 'dage'}</span></span>
-      </button>)}
+        </button>
+        <button className="iconbtn mr-2" aria-label={`Slet ${x.b.name}`} onClick={() => remove(x.b)}><Icon name="trash" size={17} /></button>
+      </div>)}
     </div>
     {hero && <p className="text-sm text-muted mt-4 flex items-center gap-2"><Icon name="bell" size={14} />Datoerne vises automatisk i kalenderen, med en påmindelse 7 dage før.</p>}
     {modal && <BirthdayModal init={modal} onClose={() => setModal(null)} />}
@@ -1463,7 +1501,48 @@ function ItemWhoModal({ item, onClose }) {
     <div><span className="lbl">Til hvem er varen?</span><MemberPick multi value={w} onChange={setW} /><p className="text-xs text-muted mt-1.5">Valgfrit. Vælg flere ved at trykke på dem.</p></div>
   </FormModal>;
 }
+
+/* ---------- Lager ---------- */
+const PLACES = [{ id:'fryser', label:'Fryser', icon:'snowflake' }, { id:'koleskab', label:'Køleskab', icon:'utensils' }, { id:'basis', label:'Basislager (skab)', icon:'cart' }];
+const BASIS_QUICK = ['Mel', 'Sukker', 'Ris', 'Pasta', 'Havregryn', 'Salt', 'Peber', 'Olie', 'Hakkede tomater på dåse', 'Kokosmælk', 'Løg', 'Hvidløg', 'Kartofler'];
+function Lager() {
+  const { db, set, notify } = useApp();
+  const [name, setName] = useState(''); const [place, setPlace] = useState('fryser'); const [qty, setQty] = useState('');
+  const list = db.pantry || [];
+  const add = (n, pl, q) => {
+    const nm = n.trim(); if (!nm) return;
+    if (list.some(x => normName(x.name) === normName(nm) && x.place === pl)) { notify(`${nm} ligger allerede der`); return; }
+    set('pantry', l => [...(l || []), { id:uid(), name:nm, place:pl, qty:(q || '').trim() }]);
+  };
+  const remove = it => { set('pantry', l => l.filter(x => x.id !== it.id)); notify(`${it.name} er fjernet fra lageret`, { label:'Fortryd', fn:() => set('pantry', l => l.some(x => x.id === it.id) ? l : [...l, it]) }); };
+  const submit = e => { e.preventDefault(); add(name, place, qty); setName(''); setQty(''); };
+  return <div>
+    <form onSubmit={submit} className="card p-3 flex flex-wrap gap-2 mb-4">
+      <input className="field flex-1 min-w-[150px]" value={name} onChange={e => setName(e.target.value)} placeholder="Fx hakket oksekød" aria-label="Vare på lager" />
+      <input className="field w-28" value={qty} onChange={e => setQty(e.target.value)} placeholder="Mængde" aria-label="Mængde (valgfri)" />
+      <select className="field w-auto" value={place} onChange={e => setPlace(e.target.value)} aria-label="Hvor ligger den?">{PLACES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+      <button className="btn btn-primary" type="submit"><Icon name="plus" size={16} />Læg på lager</button>
+    </form>
+    <div className="mb-5"><p className="lbl">Hurtig-tilføj til basislager</p>
+      <div className="flex flex-wrap gap-1.5">{BASIS_QUICK.map(n => { const on = list.some(x => normName(x.name) === normName(n));
+        return <button key={n} className="chip" disabled={on} style={{ opacity:on ? .5 : 1 }} onClick={() => add(n, 'basis')}><Icon name={on ? 'check' : 'plus'} size={13} />{n}</button>; })}</div></div>
+    <p className="text-sm text-muted mb-4 flex items-start gap-2"><Icon name="sparkles" size={15} className="mt-0.5 text-accent shrink-0" />Varer på lageret bliver ikke lagt på indkøbslisten, når du overfører ingredienser fra madplanen. Slet varen herfra, når den er brugt op.</p>
+    {list.length === 0 && <div className="card"><Empty icon="cart" text="Lageret er tomt. Tilføj det, du har i fryseren og i skabene." /></div>}
+    <div className="grid gap-4 lg:grid-cols-2 items-start">
+      {PLACES.map(pl => { const items = list.filter(x => x.place === pl.id).sort((a, b) => a.name.localeCompare(b.name, 'da')); if (!items.length) return null;
+        return <section key={pl.id} className="card p-4 min-w-0">
+          <SectionTitle right={<span className="text-xs text-muted tnum">{items.length}</span>}>{pl.label}</SectionTitle>
+          <ul className="flex flex-col">{items.map(it => <li key={it.id} className="flex items-center gap-3 py-2 border-t border-line first:border-t-0">
+            <p className="flex-1 min-w-0 truncate font-medium">{it.name}</p>
+            {it.qty && <span className="text-xs text-muted shrink-0">{it.qty}</span>}
+            <button className="btn btn-sm shrink-0" onClick={() => remove(it)} aria-label={`Brugt op: ${it.name}`}><Icon name="check" size={14} />Brugt op</button>
+          </li>)}</ul>
+        </section>; })}
+    </div>
+  </div>;
+}
 function Indkoeb() {
+  const [sub, setSub] = useState('liste');
   const { db, set, notify } = useApp();
   const [name, setName] = useState(''); const [cat, setCat] = useState('auto');
   const [step, setStep] = useState(-1); const [copyBox, setCopyBox] = useState(null); const [who, setWho] = useState([]); const [whoEdit, setWhoEdit] = useState(null);
@@ -1506,8 +1585,13 @@ function Indkoeb() {
     if (ok) notify('Listen er kopieret. Indsæt den i en Claude-chat.'); else setCopyBox(text);
   };
   const groups = CATS.map(c => ({ c, list:items.filter(i => i.cat === c.id).sort((a, b) => a.done - b.done) })).filter(g => g.list.length);
+  if (sub === 'lager') return <div>
+    <PageHead icon="cart" tint="aqua" title="Lager" sub={`${(db.pantry || []).length} varer på lager`}>
+      <div className="seg"><button aria-pressed={false} onClick={() => setSub('liste')}>Indkøbsliste</button><button aria-pressed={true} onClick={() => setSub('lager')}>Lager</button></div>
+    </PageHead><Lager /></div>;
   return <div>
     <PageHead icon="cart" tint="aqua" title="Indkøbsliste" sub={`${left.length} ${left.length === 1 ? 'vare' : 'varer'} tilbage · sorteret efter supermarkedets afdelinger`}>
+      <div className="seg"><button aria-pressed={true} onClick={() => setSub('liste')}>Indkøbsliste</button><button aria-pressed={false} onClick={() => setSub('lager')}>Lager{(db.pantry || []).length ? ` (${db.pantry.length})` : ''}</button></div>
       <button className="btn" onClick={copy}><Icon name="copy" size={16} />Kopier liste til AI-tjek</button>
       <button className="btn btn-primary" onClick={runCheck} disabled={step >= 0}><Icon name={step >= 0 ? 'loader' : 'tag'} size={16} className={step >= 0 ? 'animate-spin' : ''} />{checked ? 'Skjul tilbud' : 'Tjek tilbud'}</button>
     </PageHead>
@@ -1556,12 +1640,14 @@ function Indkoeb() {
 }
 
 /* ---------- Madplan ---------- */
-function addToShopping(shopping, ings) {
-  const out = [...shopping]; let added = 0;
+function addToShopping(shopping, ings, pantry) {
+  const out = [...shopping]; let added = 0; const skipped = [];
   ings.forEach(ing => { const nm = (ing || '').trim();
+    if (nm && inPantry(pantry, nm)) { skipped.push(nm); return; }
     if (nm && !out.some(s => !s.done && s.name.toLowerCase() === nm.toLowerCase())) { out.push({ id:uid(), name:nm, cat:guessCat(nm), done:false, who:[] }); added++; } });
-  return { list:out, added };
+  return { list:out, added, skipped };
 }
+const shopMsg = (added, skipped) => (added ? `${added} ${added === 1 ? 'vare' : 'varer'} lagt på indkøbslisten` : 'Intet nyt på indkøbslisten') + (skipped.length ? `. ${skipped.length} ${skipped.length === 1 ? 'vare' : 'varer'} sprunget over, fordi de er på lager (${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ' …' : ''})` : '');
 const catName = n => CATS.find(c => c.id === guessCat(n)).name;
 
 function MealModal({ date, init, onClose }) {
@@ -1586,7 +1672,7 @@ function MealModal({ date, init, onClose }) {
     if (!name) { set('meals', m => { const n = { ...m }; delete n[date]; return n; }); onClose(); return; }
     set('meals', m => ({ ...m, [date]:{ dish:name, cook, ingredients:list, transferred:!!transfer } }));
     if (save && !db.recipes.some(r => normName(r.name) === normName(name))) set('recipes', l => [...l, { id:uid(), name, ingredients:list }]);
-    if (transfer) { const { list:sl, added } = addToShopping(db.shopping, list); set('shopping', sl); notify(added ? `${added} ${added === 1 ? 'vare' : 'varer'} lagt på indkøbslisten` : 'Alt var allerede på listen', { label:'Se listen', fn:() => go('indkoeb') }); }
+    if (transfer) { const { list:sl, added, skipped } = addToShopping(db.shopping, list, db.pantry); set('shopping', sl); notify(shopMsg(added, skipped), { label:'Se listen', fn:() => go('indkoeb') }); }
     onClose();
   };
   return <FormModal title={`Madplan, ${fmtLong(parse(date)).toLowerCase()}`} onClose={onClose} onSubmit={e => { e.preventDefault(); saveMeal(false); }}
@@ -1599,11 +1685,11 @@ function MealModal({ date, init, onClose }) {
       {auto && <p className="text-xs rounded-xl bg-accentsoft text-accent px-3 py-2 mb-2 flex items-center gap-1.5"><Icon name="sparkles" size={13} />Udfyldt fra opskriften "{auto}". Ret, tilføj eller slet frit.</p>}
       <ul className="flex flex-col gap-1.5">{ings.map((x, i) => <li key={i} className="flex items-center gap-2">
         <input className="field" value={x} onChange={e => edit(l => l.map((y, j) => j === i ? e.target.value : y))} aria-label={`Ingrediens ${i + 1}`} />
-        <span className="hidden sm:block text-[11px] text-muted w-24 shrink-0 truncate">{x.trim() ? catName(x) : ''}</span>
+        {inPantry(db.pantry, x) ? <span className="text-[11px] font-semibold rounded-full bg-goodsoft text-goodink px-2 py-0.5 shrink-0">På lager</span> : <span className="hidden sm:block text-[11px] text-muted w-24 shrink-0 truncate">{x.trim() ? catName(x) : ''}</span>}
         <button type="button" className="iconbtn" aria-label={`Fjern ${x}`} onClick={() => edit(l => l.filter((_, j) => j !== i))}><Icon name="x" size={16} /></button></li>)}</ul>
       <div className="flex gap-2 mt-2"><input className="field" value={newIng} onChange={e => setNewIng(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIng(); } }} placeholder="Tilføj ingrediens" aria-label="Ny ingrediens" />
         <button type="button" className="btn shrink-0" onClick={addIng}><Icon name="plus" size={16} />Tilføj</button></div>
-      <p className="text-xs text-muted mt-1.5">På indkøbslisten bliver varerne sorteret i kategorier automatisk.</p>
+      <p className="text-xs text-muted mt-1.5">På indkøbslisten bliver varerne sorteret i kategorier automatisk. Varer, du har på lager, bliver ikke lagt på listen.</p>
     </div>
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={save} onChange={e => setSave(e.target.checked)} />Gem som min opskrift</label>
   </FormModal>;
@@ -1633,9 +1719,9 @@ function Madplan() {
   const transfer = keys => {
     const meals = { ...db.meals }; let all = [];
     keys.forEach(k => { const m = meals[k]; if (!m) return; all = all.concat(m.ingredients || []); meals[k] = { ...m, transferred:true }; });
-    const { list, added } = addToShopping(db.shopping, all);
+    const { list, added, skipped } = addToShopping(db.shopping, all, db.pantry);
     set('shopping', list); set('meals', meals);
-    notify(added ? `${added} ${added === 1 ? 'vare' : 'varer'} lagt på indkøbslisten` : 'Alt var allerede på listen', { label:'Se listen', fn:() => go('indkoeb') });
+    notify(shopMsg(added, skipped), { label:'Se listen', fn:() => go('indkoeb') });
   };
   const addRecipe = e => {
     e.preventDefault(); const name = rf.name.trim(); if (!name) return;
