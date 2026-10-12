@@ -224,10 +224,10 @@ function birthdaysOn(list, date) {
 
 /* ---------- varekategorier og tilbud ---------- */
 const CATS = [
-  { id: 'frugt', name: 'Frugt & grønt', kw: ['banan','æble','pære','appelsin','citron','agurk','tomat','løg','kartof','gulerod','salat','peberfrugt','broccoli','squash','spinat','hvidløg','avocado','svamp','champignon','blomkål','kål','drue','jordbær','ingefær','porre','persille','basilikum','mandarin','selleri','bær','majs','gulerød','aubergine','chili','dild','rødbede','purløg','spidskål','rødkål','hvidkål','lime','cherrytomat','asparges','radiser','pastinak','græskar','rucola','mynte','koriander','krydderurt','mango','ananas','melon','fersken'] },
-  { id: 'mejeri', name: 'Mejeri & æg', kw: ['mælk','æg','smør','ost','yoghurt','skyr','fløde','fraiche','mozzarella','parmesan','feta','kvark','cheddar','remoulade'] },
-  { id: 'koed', name: 'Kød & fisk', kw: ['kylling','hakket','okse','svine','bacon','pølse','laks','torsk','fisk','rejer','skinke','pålæg','frikadelle','kød','medister','flæsk','bøf','kalkun','leverpostej','sild','tun','pepperoni'] },
-  { id: 'broed', name: 'Brød & kolonial', kw: ['brød','rugbrød','toast','havregryn','müsli','pasta','spaghetti','ris','mel','sukker','kaffe','bønner','linser','sauce','ketchup','olie','eddike','krydder','salt','peber','nudler','cornflakes','knækbrød','hotdogbrød','karry','rasp','tacoskaller','marmelade','honning','bulgur','couscous','tortilla','rundstykke','kiks','chokolade','chips','nødder','gær','bouillon','burgerbolle','tomatpuré','dåse'] },
+  { id: 'frugt', name: 'Frugt & grønt', kw: ['banan','æble','pære','appelsin','citron','agurk','tomat','løg','kartof','gulerod','salat','peberfrugt','broccoli','squash','spinat','hvidløg','avocado','svamp','champignon','blomkål','kål','drue','jordbær','ingefær','porre','persille','basilikum','mandarin','selleri','bær','majs','gulerød','aubergine','chili','dild','timian','rosmarin','mynte','koriander','oregano','rødbede','purløg','spidskål','rødkål','hvidkål','lime','cherrytomat','asparges','radiser','pastinak','græskar','rucola','mynte','koriander','krydderurt','mango','ananas','melon','fersken'] },
+  { id: 'mejeri', name: 'Mejeri & æg', kw: ['mælk','æg','smør','ost','yoghurt','skyr','fløde','fraiche','mozzarella','stracciatella','burrata','parmesan','feta','kvark','cheddar','remoulade'] },
+  { id: 'koed', name: 'Kød & fisk', kw: ['kylling','hakket','okse','svine','bacon','pølse','laks','torsk','fisk','rejer','skinke','pålæg','frikadelle','salami','nduja','chorizo','spegepølse','kød','medister','flæsk','bøf','kalkun','leverpostej','sild','tun','pepperoni'] },
+  { id: 'broed', name: 'Brød & kolonial', kw: ['olivenolie','rapsolie','brød','rugbrød','toast','havregryn','müsli','pasta','spaghetti','ris','mel','sukker','kaffe','bønner','linser','sauce','ketchup','olie','eddike','krydder','salt','peber','nudler','cornflakes','knækbrød','hotdogbrød','karry','rasp','tacoskaller','marmelade','honning','bulgur','couscous','tortilla','rundstykke','kiks','chokolade','chips','nødder','gær','bouillon','burgerbolle','tomatpuré','dåse'] },
   { id: 'frost', name: 'Frost', kw: ['frost','frosne','pizza','ærter','fiskefilet','pommes','vaniljeis','flødeis','nuggets','wokgrøntsager'] },
   { id: 'drikke', name: 'Drikkevarer', kw: ['juice','vand','sodavand','cola','øl','vin','saft','kakao','læsk'] },
   { id: 'hush', name: 'Husholdning', kw: ['toiletpapir','køkkenrulle','opvask','vaskemiddel','skyllemiddel','affald','sæbe','shampoo','tandpasta','ble','serviet','svamp','rengøring','batteri','bagepapir','folie'] },
@@ -240,7 +240,49 @@ function matchKw(name, kw) {
   return kw.some(k => k.length <= 4 ? tokens.some(t => t.startsWith(k)) : n.includes(k));
 }
 const PANTRY_RE = /dåse|puré|kokosmælk|havremælk|mandelmælk|bouillon|\bfond\b|sojasovs|ketchup|tortilla|pesto|lasagneplader|nudler|pasta|spaghetti|\bris\b|risotto|\bmel\b|hvedemel|rasp|sukker|linser|bønner|tarteletter|chips/i;
+
+/* ---------- ingrediens-parsing, samling af ens varer ---------- */
+let USER_CATS = {};
+const ING_UNITS = 'kg|gr|g|dl|ml|cl|l|spsk|tsk|stk|fed|bundt|bdt|dåser|dåse|ds|pakker|pakke|pk|knivspids|skiver|skive|håndfulde|håndfuld|glas|bakke|bakker|pose|poser|stk';
+const ING_RE = new RegExp('^\\s*(\\d+[.,]?\\d*\\s*[½¼¾]?|[½¼¾])\\s*(' + ING_UNITS + ')?\\.?(?=\\s|$)\\s*(.*)$', 'i');
+const FRAC = { '½':.5, '¼':.25, '¾':.75 };
+const FILLER = /\b(frisk|friske|friskrevet|friskkværnet|finthakket|revet|hakket\s+frisk)\b/g;
+function parseIng(s) {
+  const raw = (s || '').trim(); let qty = null, unit = '', rest = raw;
+  const m = raw.match(ING_RE);
+  if (m) {
+    let q = m[1].replace(/\s+/g, '').replace(',', '.'); let n = 0;
+    q = q.replace(/[½¼¾]/g, ch => { n += FRAC[ch]; return ''; });
+    const base = q ? parseFloat(q) : 0; const v = base + n;
+    if (!isNaN(v) && v > 0) { qty = v; unit = (m[2] || '').toLowerCase(); rest = m[3] || ''; }
+    unit = { gr:'g', dåser:'dåse', ds:'dåse', bdt:'bundt', pakker:'pakke', pk:'pakke', skive:'skiver', håndfulde:'håndfuld', bakker:'bakke', poser:'pose' }[unit] || unit;
+  }
+  const label = rest.replace(/\([^)]*\)/g, ' ').split(',')[0].replace(/\s+/g, ' ').trim();
+  const key = normName(label).replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  return { qty, unit, label:label || raw, key, raw };
+}
+const fmtQty = n => Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100).replace('.', ',');
+function combineNames(names) {
+  const ps = names.map(parseIng); const label = ps[0].label;
+  const groups = []; ps.forEach(p => { if (p.qty == null) return; const g = groups.find(x => x.unit === p.unit); if (g) g.qty += p.qty; else groups.push({ unit:p.unit, qty:p.qty }); });
+  if (!groups.length) return label;
+  const part = g => fmtQty(g.qty) + (g.unit ? ' ' + g.unit : '');
+  if (groups.length === 1) return `${part(groups[0])} ${label}`;
+  return `${label} (${groups.map(part).join(' + ')})`;
+}
+function mergeShopping(list) {
+  const out = []; const idx = {}; let merged = 0;
+  list.forEach(it => {
+    const p = parseIng(it.name);
+    if (it.done || !p.key || /&| og /.test(p.label)) { out.push(it); return; }
+    if (idx[p.key] == null) { idx[p.key] = out.length; out.push({ ...it, _names:[it.name] }); return; }
+    const t = out[idx[p.key]]; t._names.push(it.name); merged++;
+    t.who = Array.from(new Set([...(t.who || []), ...(it.who || [])]));
+  });
+  return { list:out.map(it => { if (it._names && it._names.length > 1) { const { _names, ...r } = it; return { ...r, name:combineNames(_names) }; } const { _names, ...r } = it; return r; }), merged };
+}
 function guessCat(name) {
+  const uk = USER_CATS[parseIng(name).key]; if (uk) return uk;
   for (const id of ['frost', 'hush', 'drikke']) { if (matchKw(name, CATS.find(c => c.id === id).kw)) return id; }
   if (PANTRY_RE.test(name)) return 'broed';
   for (const id of ['koed', 'mejeri', 'frugt', 'broed']) { if (matchKw(name, CATS.find(c => c.id === id).kw)) return id; }
@@ -668,7 +710,7 @@ const FRESH_MEMBERS = [
 const OLD_COLORS = { '#4F7CAC':'#5BB6D6', '#C0697B':'#EE8FB3', '#4E9A78':'#6FCBA3', '#D09A33':'#F3BE4F' };
 const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7B', '#7AA7F0', '#B7C95A'];
 function emptyDb() {
-  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
+  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
     sessions:[], goals:[], tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
@@ -1542,7 +1584,17 @@ function Foedselsdage() {
 /* ---------- Indkøb ---------- */
 function ItemWhoModal({ item, onClose }) {
   const { set } = useApp(); const [w, setW] = useState(item.who || []);
-  return <FormModal title={item.name} onClose={onClose} onSubmit={e => { e.preventDefault(); set('shopping', l => l.map(x => x.id === item.id ? { ...x, who:w } : x)); onClose(); }}>
+  const [name, setName] = useState(item.name); const [cat, setCat] = useState(item.cat);
+  const submit = e => {
+    e.preventDefault(); const nm = name.trim() || item.name;
+    set('shopping', l => l.map(x => x.id === item.id ? { ...x, name:nm, cat, who:w } : x));
+    if (cat !== item.cat) { const k = parseIng(nm).key; if (k) set('catMap', m => ({ ...(m || {}), [k]:cat })); }
+    onClose();
+  };
+  return <FormModal title="Redigér vare" onClose={onClose} onSubmit={submit}>
+    <Field label="Vare"><input className="field" value={name} onChange={e => setName(e.target.value)} /></Field>
+    <Field label="Kategori"><select className="field" value={cat} onChange={e => setCat(e.target.value)}>{CATS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <p className="text-xs text-muted mt-1.5">Appen husker dit valg, næste gang varen bliver tilføjet.</p></Field>
     <div><span className="lbl">Til hvem er varen?</span><MemberPick multi value={w} onChange={setW} /><p className="text-xs text-muted mt-1.5">Valgfrit. Vælg flere ved at trykke på dem.</p></div>
   </FormModal>;
 }
@@ -1573,9 +1625,9 @@ function Lager() {
         return <button key={n} className="chip" disabled={on} style={{ opacity:on ? .5 : 1 }} onClick={() => add(n, 'basis')}><Icon name={on ? 'check' : 'plus'} size={13} />{n}</button>; })}</div></div>
     <p className="text-sm text-muted mb-4 flex items-start gap-2"><Icon name="sparkles" size={15} className="mt-0.5 text-accent shrink-0" />Varer på lageret bliver ikke lagt på indkøbslisten, når du overfører ingredienser fra madplanen. Slet varen herfra, når den er brugt op.</p>
     {list.length === 0 && <div className="card"><Empty icon="cart" text="Lageret er tomt. Tilføj det, du har i fryseren og i skabene." /></div>}
-    <div className="grid gap-4 lg:grid-cols-2 items-start">
+    <div className="columns-1 lg:columns-2 gap-4">
       {PLACES.map(pl => { const items = list.filter(x => x.place === pl.id).sort((a, b) => a.name.localeCompare(b.name, 'da')); if (!items.length) return null;
-        return <section key={pl.id} className="card p-4 min-w-0">
+        return <section key={pl.id} className="card p-4 min-w-0 break-inside-avoid mb-4">
           <SectionTitle right={<span className="text-xs text-muted tnum">{items.length}</span>}>{pl.label}</SectionTitle>
           <ul className="flex flex-col">{items.map(it => <li key={it.id} className="flex items-center gap-3 py-2 border-t border-line first:border-t-0">
             <p className="flex-1 min-w-0 truncate font-medium">{it.name}</p>
@@ -1598,8 +1650,10 @@ function Indkoeb() {
   const add = (n, c, w) => {
     const nm = n.trim(); if (!nm) return;
     if (items.some(i => !i.done && i.name.toLowerCase() === nm.toLowerCase())) { notify(`${nm} står allerede på listen`); return; }
-    set('shopping', l => [...l, { id:uid(), name:nm, cat:c && c !== 'auto' ? c : guessCat(nm), done:false, who:w || [] }]);
+    set('shopping', l => mergeShopping([...l, { id:uid(), name:nm, cat:c && c !== 'auto' ? c : guessCat(nm), done:false, who:w || [] }]).list);
   };
+  const dupes = mergeShopping(items).merged;
+  const collapse = () => { const before = items; const { list, merged } = mergeShopping(items); set('shopping', list); notify(`${merged} ${merged === 1 ? 'linje' : 'linjer'} samlet`, { label:'Fortryd', fn:() => set('shopping', before) }); };
   const submit = e => { e.preventDefault(); add(name, cat, who); setName(''); setWho([]); };
   const toggle = id => set('shopping', l => l.map(i => i.id === id ? { ...i, done:!i.done } : i));
   const remove = id => set('shopping', l => l.filter(i => i.id !== id));
@@ -1658,8 +1712,11 @@ function Indkoeb() {
         return <button key={n} className="chip" disabled={on} style={{ opacity:on ? .5 : 1 }} onClick={() => add(n, c)}>{on ? <Icon name="check" size={13} /> : <Icon name="plus" size={13} />}{n}</button>; })}</div>
     </div>
     {groups.length === 0 && <div className="card"><Empty icon="cart" text="Listen er tom. Tilføj varer ovenfor eller brug hurtig-tilføj." /></div>}
-    <div className="grid gap-4 lg:grid-cols-2 items-start">
-      {groups.map(({ c, list }) => <section key={c.id} className="card p-4 min-w-0">
+    {dupes > 0 && <div className="rounded-2xl px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-2 text-sm" style={{ background:'var(--t-sun)' }}>
+      <span className="flex items-center gap-2"><Icon name="sparkles" size={16} className="text-warn" />{dupes} {dupes === 1 ? 'vare står' : 'varer står'} på flere linjer. Fx samme krydderi to gange.</span>
+      <button className="btn btn-sm" onClick={collapse}>Saml ens varer</button></div>}
+    <div className="columns-1 lg:columns-2 gap-4">
+      {groups.map(({ c, list }) => <section key={c.id} className="card p-4 min-w-0 break-inside-avoid mb-4">
         <SectionTitle right={<span className="text-xs text-muted tnum">{list.filter(i => !i.done).length} / {list.length}</span>}>{c.name}</SectionTitle>
         <ul className="flex flex-col">{list.map(i => { const d = checked && !i.done ? findDeal(i.name) : null;
           return <li key={i.id} className="flex items-center gap-3 py-2 border-t border-line first:border-t-0">
@@ -1669,7 +1726,7 @@ function Indkoeb() {
               {d && <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold rounded-full bg-goodsoft text-goodink px-2 py-0.5 mt-0.5"><Icon name="tag" size={12} />På tilbud i {d.store} til {num(d.price)} kr.<span className="font-normal opacity-80 tnum">(før {num(d.was)})</span></p>}
               {i.who && i.who.length > 0 && <div className="mt-1"><Who ids={i.who} small /></div>}
             </div>
-            <button className="iconbtn" aria-label={`Vælg personer for ${i.name}`} onClick={() => setWhoEdit(i)}><Icon name="users" size={16} /></button>
+            <button className="iconbtn" aria-label={`Redigér ${i.name}`} title="Redigér navn, kategori og personer" onClick={() => setWhoEdit(i)}><Icon name="pencil" size={16} /></button>
             <button className="iconbtn" aria-label={`Fjern ${i.name}`} onClick={() => remove(i.id)}><Icon name="x" size={16} /></button>
           </li>; })}</ul>
       </section>)}
@@ -1690,7 +1747,7 @@ function addToShopping(shopping, ings, pantry) {
   ings.forEach(ing => { const nm = (ing || '').trim();
     if (nm && inPantry(pantry, nm)) { skipped.push(nm); return; }
     if (nm && !out.some(s => !s.done && s.name.toLowerCase() === nm.toLowerCase())) { out.push({ id:uid(), name:nm, cat:guessCat(nm), done:false, who:[] }); added++; } });
-  return { list:out, added, skipped };
+  return { list:mergeShopping(out).list, added, skipped };
 }
 const shopMsg = (added, skipped) => (added ? `${added} ${added === 1 ? 'vare' : 'varer'} lagt på indkøbslisten` : 'Intet nyt på indkøbslisten') + (skipped.length ? `. ${skipped.length} ${skipped.length === 1 ? 'vare' : 'varer'} sprunget over, fordi de er på lager (${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ' …' : ''})` : '');
 const catName = n => CATS.find(c => c.id === guessCat(n)).name;
@@ -2204,6 +2261,7 @@ const VIEWS = { overblik:Overblik, kalender:Kalender, foedselsdage:Foedselsdage,
 
 function App() {
   const [db, setDb] = useState(loadDb);
+  USER_CATS = db.catMap || {};
   const [toast, setToast] = useState(null); const [fam, setFam] = useState(false); const [share, setShare] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false); const [more, setMore] = useState(false);
   const [tick, setTick] = useState(0);
