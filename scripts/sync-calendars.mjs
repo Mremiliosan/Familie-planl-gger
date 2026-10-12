@@ -257,14 +257,18 @@ function expandFeed(feed, text) {
 async function fetchIcs(rawUrl) {
   let url = rawUrl.trim().replace(/^webcal:\/\//i, 'https://');
   if (url.startsWith('file:')) return readFile(new URL(url), 'utf8'); // kun til test
-  const tries = /^http:\/\//i.test(url) ? [url.replace(/^http:/i, 'https:'), url] : [url];
+  const urls = /^http:\/\//i.test(url) ? [url.replace(/^http:/i, 'https:'), url] : [url];
+  const agents = ['Familieplanlaegger/1.0 (kalendersync)', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'];
   let lastErr;
-  for (const u of tries) {
+  for (const u of urls) for (const ua of agents) {
     try {
-      const res = await fetch(u, { redirect: 'follow', signal: AbortSignal.timeout(30000), headers: { 'User-Agent': 'Familieplanlaegger/1.0 (kalendersync)', Accept: 'text/calendar, text/plain, */*' } });
+      const res = await fetch(u, { redirect: 'follow', signal: AbortSignal.timeout(30000), headers: { 'User-Agent': ua, Accept: 'text/calendar, text/plain, */*' } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const t = await res.text();
-      if (!/BEGIN:VCALENDAR/i.test(t)) throw new Error('Svaret er ikke en iCal-fil');
+      if (!/BEGIN:VCALENDAR/i.test(t)) {
+        let host = ''; try { host = new URL(res.url).host; } catch (e) {}
+        throw new Error(`Svaret er ikke en iCal-fil (${(res.headers.get('content-type') || 'ukendt type').split(';')[0]}, ${t.length} tegn, fra ${host})`);
+      }
       return t;
     } catch (e) { lastErr = e; }
   }
