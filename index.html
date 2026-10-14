@@ -1092,7 +1092,7 @@ function Overblik() {
         : <p className="text-sm text-muted">Ingen datoer endnu.</p>}
     </Card>
   };
-  const order = pinned.length ? ['beskeder', 'kalender', 'mad', 'opgaver', 'familiemaal', 'indkoeb', 'foedsel'] : ['kalender', 'mad', 'opgaver', 'familiemaal', 'indkoeb', 'beskeder', 'foedsel'];
+  const order = pinned.length ? ['beskeder', 'kalender', 'mad', 'opgaver', 'indkoeb', 'familiemaal', 'foedsel'] : ['kalender', 'mad', 'opgaver', 'indkoeb', 'familiemaal', 'beskeder', 'foedsel'];
   return <div>
     <div className="flex items-center gap-4 mb-6">
       <img src={LOGO} alt="Familie J" width="64" height="64" className="rounded-[20px] shrink-0 shadow-lg" style={{ boxShadow:'var(--shadow)' }} />
