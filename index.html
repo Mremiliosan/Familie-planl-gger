@@ -126,6 +126,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
 /* ---------- ikoner (Lucide-stil, inline) ---------- */
 const ICONS = {
+  down:'<path d="m6 9 6 6 6-6"/>',
   star:'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
   plus:'<path d="M5 12h14M12 5v14"/>',
   x:'<path d="M18 6 6 18M6 6l12 12"/>',
@@ -710,7 +711,7 @@ const FRESH_MEMBERS = [
 const OLD_COLORS = { '#4F7CAC':'#5BB6D6', '#C0697B':'#EE8FB3', '#4E9A78':'#6FCBA3', '#D09A33':'#F3BE4F' };
 const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7B', '#7AA7F0', '#B7C95A'];
 function emptyDb() {
-  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
+  return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], choreQuick:null, catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
     sessions:[], goals:[], tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
@@ -798,7 +799,7 @@ function loadDb() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      if (p && p.v === 1) { const base = emptyDb(); return { ...base, ...p, ui:{ ...base.ui, ...(p.ui || {}) }, settings:{ ...base.settings, ...(p.settings || {}) } }; }
+      if (p && p.v === 1) { const base = emptyDb(); const tasks = (p.tasks || []).map(t => t.status === 'doing' ? { ...t, status:'todo' } : t); return { ...base, ...p, tasks, ui:{ ...base.ui, ...(p.ui || {}) }, settings:{ ...base.settings, ...(p.settings || {}) } }; }
     }
   } catch (e) {}
   return seedDb();
@@ -2002,6 +2003,8 @@ function Traening() {
 }
 
 /* ---------- Opgaver, lommepenge og belønningsoversigt ---------- */
+const CHORES_KIDS = ['Dække bord', 'Rydde af bord', 'Tømme opvasker', 'Fylde opvasker', 'Rydde værelse', 'Rede seng', 'Tage skraldet ud', 'Give hunden mad', 'Lufte hunden', 'Støvsuge eget værelse', 'Pakke skoletaske', 'Lægge vasketøj sammen', 'Vande planter', 'Tørre støv af', 'Feje køkkengulv', 'Samle legetøj op'];
+const CHORES_ADULTS = ['Lave aftensmad', 'Lave madpakker', 'Handle ind', 'Vaske tøj', 'Hænge vasketøj op', 'Stryge', 'Støvsuge', 'Vaske gulv', 'Gøre badeværelse rent', 'Skifte sengetøj', 'Rydde op i entreen', 'Tømme skraldespande', 'Rengøre køleskab', 'Bage', 'Betale regninger', 'Planlægge ugens madplan'];
 const COLS = [{ id:'todo', name:'Skal laves' }, { id:'doing', name:'I gang' }, { id:'done', name:'Færdig' }];
 const resolveWho = (members, mems) => mems.includes('all') ? members.map(m => m.id) : mems;
 
@@ -2009,6 +2012,10 @@ function TaskModal({ init, onClose }) {
   const { db, set } = useApp();
   const [f, setF] = useState({ ...init, assignees:memsOf(init), repeat:taskRepeat(init), pay:(init.reward || 0) > 0, reward:init.reward > 0 ? String(init.reward) : '' });
   const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const [editQ, setEditQ] = useState(false); const [newQ, setNewQ] = useState({ kids:'', adults:'' });
+  const quick = { kids:(db.choreQuick && db.choreQuick.kids) || CHORES_KIDS, adults:(db.choreQuick && db.choreQuick.adults) || CHORES_ADULTS };
+  const saveQuick = (key, list) => set('choreQuick', { ...quick, [key]:list });
+  const addQuick = key => { const v = newQ[key].trim(); if (!v) return; if (!quick[key].some(x => x.toLowerCase() === v.toLowerCase())) saveQuick(key, [...quick[key], v]); setNewQ(p => ({ ...p, [key]:'' })); };
   const unit = db.rewardUnit === 'kr' ? 'kroner' : 'point';
   const submit = e => {
     e.preventDefault(); if (!f.title.trim()) return;
@@ -2020,6 +2027,20 @@ function TaskModal({ init, onClose }) {
   const del = () => { set('tasks', l => l.filter(x => x.id !== f.id)); onClose(); };
   return <FormModal title={f.id ? 'Redigér opgave' : 'Ny opgave'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
     <Field label="Opgave"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx tøm opvasker" /></Field>
+    {!f.id && <div className="flex flex-col gap-3 -mt-1">
+      {[['kids', 'Hurtigt valg til børn'], ['adults', 'Hurtigt valg til voksne']].map(([key, lbl]) => { const list = quick[key]; return <div key={key}>
+        <div className="flex items-center justify-between gap-2 mb-1.5"><span className="lbl mb-0">{lbl}</span>
+          {key === 'kids' && <button type="button" className="text-xs font-semibold text-accent" onClick={() => setEditQ(v => !v)}>{editQ ? 'Færdig' : 'Redigér'}</button>}</div>
+        <div className="flex flex-wrap gap-1.5">{list.map(t => <span key={t} className="inline-flex items-center">
+          <button type="button" className="chip" aria-pressed={f.title === t} onClick={() => u('title', t)}>{t}</button>
+          {editQ && <button type="button" className="iconbtn" style={{ width:28, height:28 }} aria-label={`Slet hurtigt valg ${t}`} onClick={() => saveQuick(key, list.filter(x => x !== t))}><Icon name="x" size={14} /></button>}</span>)}
+          {!list.length && <span className="text-sm text-muted">Ingen. Tilføj nedenfor.</span>}</div>
+        {editQ && <div className="flex gap-2 mt-2"><input className="field" value={newQ[key]} placeholder="Nyt hurtigt valg" aria-label={`Nyt hurtigt valg (${key === 'kids' ? 'børn' : 'voksne'})`} onChange={e => setNewQ(p => ({ ...p, [key]:e.target.value }))}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQuick(key); } }} />
+          <button type="button" className="btn shrink-0" onClick={() => addQuick(key)}><Icon name="plus" size={16} />Tilføj</button></div>}
+      </div>; })}
+      {editQ && <button type="button" className="text-xs text-muted underline self-start" onClick={() => { set('choreQuick', null); }}>Gendan standardlisterne</button>}
+    </div>}
     <div><span className="lbl">Hvem?</span><MemberPick multi all value={f.assignees} onChange={v => u('assignees', v)} /><p className="text-xs text-muted mt-1.5">Vælg flere ved at trykke på dem.</p></div>
     <Field label="Gentagelse"><select className="field" value={f.repeat} onChange={e => u('repeat', e.target.value)}>{REPEATS.map(r => <option key={r.id} value={r.id}>{r.id === 'none' ? 'Engangsopgave' : r.label}</option>)}</select></Field>
     <div className="rounded-2xl bg-surface2 p-3 flex flex-col gap-2.5">
@@ -2047,7 +2068,7 @@ function PayModal({ member, mode, balance, onClose }) {
 
 function Pligter() {
   const { db, set, up, notify } = useApp();
-  const [view, setView] = useState('board'); const [who, setWho] = useState('all'); const [period, setPeriod] = useState('week');
+  const [showDone, setShowDone] = useState(true); const [who, setWho] = useState('all'); const [period, setPeriod] = useState('week');
   const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
   const unitKr = db.rewardUnit === 'kr';
   const money = n => unitKr ? `${num(n)} kr.` : `${num(n)} point`;
@@ -2066,21 +2087,18 @@ function Pligter() {
     if (status !== 'done') doneDate = null;
     return { ...d, tasks:d.tasks.map(t => t.id === tt.id ? { ...t, status, doneDate } : t), ledger, done };
   });
-  const order = ['todo', 'doing', 'done'];
   const oneOffDone = db.tasks.filter(t => t.status === 'done' && taskRepeat(t) === 'none');
-  const newTask = status => setModal({ title:'', assignees:[(kids[0] || db.members[0]).id], status:status || 'todo', reward:0, repeat:'none' });
-  const TaskCard = ({ t }) => { const i = order.indexOf(t.status); const rp = taskRepeat(t);
-    return <div className="rounded-2xl border border-line bg-surface p-3 flex flex-col gap-2">
-      <button className="text-left" onClick={() => setModal(t)}><p className={`font-semibold text-sm ${t.status === 'done' ? 'line-through text-muted' : ''}`}>{t.title}</p></button>
-      <div className="flex flex-wrap items-center gap-1.5"><Who ids={memsOf(t)} small />
-        {t.reward > 0 && <span className="inline-flex items-center rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
-        {rp !== 'none' && <span className="inline-flex items-center gap-1 text-xs text-muted"><Icon name="repeat" size={12} />{repeatLabel(rp)}</span>}</div>
-      <div className="flex items-center gap-1 -mb-1">
-        <button className="iconbtn" disabled={i === 0} aria-label="Ryk tilbage" onClick={() => move(t, order[i - 1])}><Icon name="left" size={16} /></button>
-        <button className="iconbtn" disabled={i === 2} aria-label="Ryk frem" onClick={() => move(t, order[i + 1])}><Icon name="right" size={16} /></button>
-        <span className="flex-1" />
-        {t.status !== 'done' && <button className="btn btn-sm" onClick={() => move(t, 'done')}><Icon name="check" size={14} />Færdig</button>}
-      </div></div>; };
+  const newTask = () => setModal({ title:'', assignees:[(kids[0] || db.members[0]).id], status:'todo', reward:0, repeat:'none' });
+  const Row = ({ t }) => { const rp = taskRepeat(t); const isDone = t.status === 'done';
+    return <div className="flex items-center gap-3 px-3 py-2.5 border-t border-line first:border-t-0">
+      <Check done={isDone} label={`Marker ${t.title}`} onClick={() => move(t, isDone ? 'todo' : 'done')} />
+      <button className="text-left min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1" onClick={() => setModal(t)}>
+        <span className={`font-semibold text-sm sm:flex-1 min-w-0 ${isDone ? 'line-through text-muted' : ''}`}>{t.title}</span>
+        <span className="flex flex-wrap items-center gap-1.5 shrink-0"><Who ids={memsOf(t)} small />
+          {t.reward > 0 && <span className="inline-flex items-center rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
+          {rp !== 'none' && <span className="inline-flex items-center gap-1 text-xs text-muted"><Icon name="repeat" size={12} />{repeatLabel(rp)}</span>}</span>
+      </button></div>; };
+  const open = tasks.filter(t => t.status !== 'done'); const doneL = tasks.filter(t => t.status === 'done');
 
   /* belønningsoversigt */
   const now = new Date(); const from = period === 'week' ? iso(startOfWeek(now)) : iso(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -2090,7 +2108,6 @@ function Pligter() {
   return <div>
     <PageHead icon="listchecks" tint="mint" title="Opgaver" sub="Opgaver til hele familien og børnenes lommepenge">
       <div className="seg"><button aria-pressed={unitKr} onClick={() => set('rewardUnit', 'kr')}>Kroner</button><button aria-pressed={!unitKr} onClick={() => set('rewardUnit', 'point')}>Point</button></div>
-      <div className="seg" aria-label="Visning"><button aria-pressed={view === 'board'} onClick={() => setView('board')} aria-label="Tavle"><Icon name="grid" size={14} /></button><button aria-pressed={view === 'list'} onClick={() => setView('list')} aria-label="Liste"><Icon name="list" size={14} /></button></div>
       <button className="btn btn-primary" onClick={() => newTask()}><Icon name="plus" size={16} />Ny opgave</button>
     </PageHead>
     <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -2098,23 +2115,21 @@ function Pligter() {
       {db.members.map(m => <button key={m.id} className="chip" aria-pressed={who === m.id} onClick={() => setWho(m.id)}><Dot color={m.color} size={9} />{m.name}</button>)}
       {oneOffDone.length > 0 && <button className="btn btn-sm btn-ghost ml-auto" onClick={() => { set('tasks', l => l.filter(t => !(t.status === 'done' && taskRepeat(t) === 'none'))); notify('Færdige engangsopgaver er ryddet'); }}><Icon name="trash" size={14} />Ryd færdige engangsopgaver</button>}
     </div>
-    {view === 'board' ? <div className="grid gap-3 md:grid-cols-3 items-start">
-      {COLS.map(c => { const l = tasks.filter(t => t.status === c.id);
-        return <section key={c.id} className="rounded-3xl bg-surface2 border border-line p-3 flex flex-col gap-2 min-w-0">
-          <div className="flex items-center justify-between px-1"><h2 className="font-display font-semibold">{c.name} <span className="text-muted font-normal tnum">{l.length}</span></h2>
-            <button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Ny opgave i ${c.name}`} onClick={() => newTask(c.id)}><Icon name="plus" size={16} /></button></div>
-          {l.map(t => <TaskCard key={t.id} t={t} />)}
-          {!l.length && <p className="text-sm text-muted px-1 py-3">Ingen opgaver</p>}
-        </section>; })}
-    </div> : <div className="card divide-y divide-line">
-      {tasks.map(t => <div key={t.id} className="flex items-center gap-3 p-3">
-        <Check done={t.status === 'done'} label={`Marker ${t.title}`} onClick={() => move(t, t.status === 'done' ? 'todo' : 'done')} />
-        <button className="text-left min-w-0 flex-1" onClick={() => setModal(t)}><p className={`font-medium truncate ${t.status === 'done' ? 'line-through text-muted' : ''}`}>{t.title}</p></button>
-        {t.reward > 0 && <span className="hidden sm:inline-flex rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
-        <Who ids={memsOf(t)} small />
-      </div>)}
-      {!tasks.length && <Empty icon="listchecks" text="Ingen opgaver her endnu." />}
-    </div>}
+    <div className="grid gap-4 lg:grid-cols-2 items-start">
+      <section className="card overflow-hidden min-w-0">
+        <div className="flex items-center justify-between px-4 pt-3.5 pb-2"><h2 className="font-display font-semibold">Skal laves <span className="text-muted font-normal tnum">{open.length}</span></h2>
+          <button className="iconbtn" style={{ width:28, height:28 }} aria-label="Ny opgave" onClick={() => newTask()}><Icon name="plus" size={16} /></button></div>
+        {open.map(t => <Row key={t.id} t={t} />)}
+        {!open.length && <p className="text-sm text-muted px-4 pb-4">Alt er klaret. Godt gået!</p>}
+      </section>
+      <section className="card overflow-hidden min-w-0">
+        <button className="w-full flex items-center justify-between px-4 pt-3.5 pb-2 text-left" onClick={() => setShowDone(v => !v)} aria-expanded={showDone}>
+          <h2 className="font-display font-semibold">Færdig <span className="text-muted font-normal tnum">{doneL.length}</span></h2>
+          <Icon name={showDone ? 'down' : 'right'} size={16} className="text-muted" /></button>
+        {showDone && doneL.map(t => <Row key={t.id} t={t} />)}
+        {showDone && !doneL.length && <p className="text-sm text-muted px-4 pb-4">Ingen færdige opgaver endnu.</p>}
+      </section>
+    </div>
 
     <section className="card p-4 sm:p-5 mt-8 flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
