@@ -337,7 +337,7 @@ const LUNCH_STATES = [
 ];
 
 /* ---------- flere personer, gentagelser, hilsen ---------- */
-const memsOf = x => { if (!x) return []; if (Array.isArray(x.members) && x.members.length) return x.members; const m = x.member || x.assignee; return m ? [m] : []; };
+const memsOf = x => { if (!x) return []; if (Array.isArray(x.members) && x.members.length) return x.members; if (Array.isArray(x.assignees) && x.assignees.length) return x.assignees; const m = x.member || x.assignee; return m ? [m] : []; };
 const inMems = (list, id) => list.includes('all') || list.includes(id);
 const greeting = d => { const h = d.getHours(); return h < 5 ? 'Godnat' : h < 10 ? 'Godmorgen' : h < 12 ? 'God formiddag' : h < 17 ? 'God eftermiddag' : h < 22 ? 'Godaften' : 'Godnat'; };
 const REPEATS = [{ id:'none', label:'Ingen gentagelse' }, { id:'weekly', label:'Hver uge' }, { id:'biweekly', label:'Hver anden uge' }, { id:'monthly', label:'Hver måned' }];
@@ -713,7 +713,7 @@ const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7
 function emptyDb() {
   return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], choreQuick:null, catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
-    sessions:[], goals:[], tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    sessions:[], goals:[], familyGoal:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
 }
 function seedDb() {
@@ -960,6 +960,74 @@ function PackBlock({ onOpen }) {
   </div>;
 }
 
+/* ---------- Familiemål (opsparing) ---------- */
+function FamGoalModal({ init, onClose }) {
+  const { set } = useApp();
+  const [f, setF] = useState({ name:init.name || '', target:init.target || '' });
+  const submit = e => {
+    e.preventDefault(); const name = f.name.trim(); const target = Number(f.target);
+    if (!name || !(target > 0)) return;
+    set('familyGoal', g => ({ id:uid(), entries:[], created:iso(new Date()), ...(g || {}), name, target }));
+    onClose();
+  };
+  return <FormModal title={init.name ? 'Redigér familiemål' : 'Nyt familiemål'} onClose={onClose} onSubmit={submit}>
+    <Field label="Hvad sparer vi op til?"><input className="field" autoFocus value={f.name} onChange={e => setF(p => ({ ...p, name:e.target.value }))} placeholder="Fx biograftur for hele familien" /></Field>
+    <Field label="Forventet pris (kr.)"><input type="number" min="1" step="any" className="field" value={f.target} onChange={e => setF(p => ({ ...p, target:e.target.value }))} placeholder="Fx 800" /></Field>
+  </FormModal>;
+}
+function FamGoalCard() {
+  const { db, set, notify } = useApp();
+  const g = db.familyGoal;
+  const [edit, setEdit] = useState(null); const [amt, setAmt] = useState(''); const [lbl, setLbl] = useState('');
+  const [all, setAll] = useState(false); const [party, setParty] = useState(false);
+  const QUICK = ['Salg af tøj', 'Pant', 'Lommepenge', 'Gave'];
+  const head = <div className="flex items-center justify-between gap-2">
+    <h2 className="font-display text-lg font-semibold flex items-center gap-2.5 min-w-0"><TintIcon name="star" tint="sun" box={34} size={17} /><span className="truncate">Familiemål</span></h2>
+    {g && <button className="iconbtn" aria-label="Redigér familiemål" onClick={() => setEdit(g)}><Icon name="pencil" size={15} /></button>}</div>;
+  if (!g) return <section className="card p-4 sm:p-5 flex flex-col gap-3 min-w-0">{head}
+    <p className="text-sm text-muted">Spar sammen til en fælles oplevelse – fx biografen eller en tur i svømmehallen.</p>
+    <button className="btn btn-primary self-start" onClick={() => setEdit({})}><Icon name="plus" size={16} />Sæt et familiemål</button>
+    {edit && <FamGoalModal init={edit} onClose={() => setEdit(null)} />}</section>;
+  const saved = g.entries.reduce((s, e) => s + e.amount, 0);
+  const pct = Math.min(100, Math.round(saved / g.target * 100)); const reached = saved >= g.target;
+  const add = e => {
+    e.preventDefault(); const v = Number(amt); if (!(v > 0)) return;
+    const was = saved >= g.target;
+    set('familyGoal', x => ({ ...x, entries:[{ id:uid(), amount:v, label:lbl.trim(), date:iso(new Date()) }, ...x.entries] }));
+    setAmt(''); setLbl(''); if (!was && saved + v >= g.target) setParty(true);
+  };
+  const del = en => { set('familyGoal', x => ({ ...x, entries:x.entries.filter(y => y.id !== en.id) }));
+    notify('Beløb fjernet', { label:'Fortryd', fn:() => set('familyGoal', x => ({ ...x, entries:[en, ...x.entries].sort((a, b) => b.date.localeCompare(a.date)) })) }); };
+  const reset = () => { if (!confirm('Fjerne målet og nulstille opsparingen?')) return; const old = g; set('familyGoal', null);
+    notify('Familiemål fjernet', { label:'Fortryd', fn:() => set('familyGoal', old) }); };
+  const shown = all ? g.entries : g.entries.slice(0, 3);
+  return <section className="card p-4 sm:p-5 flex flex-col gap-3 min-w-0">{head}
+    <p className="font-display text-xl font-semibold leading-snug">{g.name}</p>
+    <div><div className="flex items-baseline justify-between text-sm"><span className="tnum"><b className="font-display text-xl">{num(saved)}</b> / {num(g.target)} kr.</span><span className="tnum text-muted">{pct}%</span></div>
+      <div className="h-3 rounded-full bg-surface2 mt-1.5 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"><div className="h-full rounded-full" style={{ width:pct + '%', background:reached ? 'var(--good)' : 'var(--accent)' }} /></div>
+      <p className="text-sm mt-1.5 text-muted">{reached ? <span className="text-goodink font-semibold">🎉 Målet er nået – tid til oplevelsen!{saved > g.target ? ` (${num(saved - g.target)} kr. over)` : ''}</span> : `Mangler ${num(g.target - saved)} kr.`}</p></div>
+    <form onSubmit={add} className="flex flex-col gap-2">
+      <div className="flex gap-2"><input type="number" min="1" step="any" className="field" style={{ maxWidth:90 }} placeholder="Beløb" aria-label="Beløb i kr." value={amt} onChange={e => setAmt(e.target.value)} />
+        <input className="field min-w-0" placeholder="Hvorfra?" aria-label="Hvorfra" value={lbl} onChange={e => setLbl(e.target.value)} />
+        <button className="btn btn-primary shrink-0 whitespace-nowrap" type="submit">Læg i</button></div>
+      <div className="flex flex-wrap gap-1.5">{QUICK.map(q => <button type="button" key={q} className="chip" aria-pressed={lbl === q} onClick={() => setLbl(lbl === q ? '' : q)}>{q}</button>)}</div>
+    </form>
+    {g.entries.length > 0 && <div className="flex flex-col gap-1">
+      {shown.map(en => <div key={en.id} className="flex items-center gap-2 text-sm px-1">
+        <span className="tnum font-semibold text-goodink w-16 shrink-0">+{num(en.amount)}</span>
+        <span className="truncate flex-1 text-muted">{en.label || 'Indbetaling'} · {parse(en.date).getDate()}/{parse(en.date).getMonth() + 1}</span>
+        <button className="iconbtn" style={{ width:28, height:28 }} aria-label="Fjern beløb" onClick={() => del(en)}><Icon name="trash" size={14} /></button></div>)}
+      {g.entries.length > 3 && <button className="btn btn-ghost btn-sm self-start" onClick={() => setAll(a => !a)}>{all ? 'Vis færre' : `Vis alle (${g.entries.length})`}</button>}
+    </div>}
+    {reached && <button className="btn btn-sm self-start" onClick={reset}>Afslut og sæt nyt mål</button>}
+    {edit && <FamGoalModal init={edit} onClose={() => setEdit(null)} />}
+    {party && <Modal title="Familiemål nået" onClose={() => setParty(false)}><div className="px-5 py-6 text-center flex flex-col gap-3">
+      <p className="text-5xl">🎉🥳</p><p className="font-display text-2xl font-semibold">I nåede jeres mål!</p>
+      <p className="text-muted">{g.name} – nu har I sparet nok. Tid til at nyde det sammen!</p>
+      <button className="btn btn-primary" onClick={() => setParty(false)}>Hurra!</button></div></Modal>}
+  </section>;
+}
+
 /* ---------- Overblik ---------- */
 function Overblik() {
   const { db, go, eventsFor, openSettings } = useApp();
@@ -1013,6 +1081,7 @@ function Overblik() {
       {openTasks.slice(0, 4).map(t => <div key={t.id} className="flex items-center gap-2.5 text-sm px-1"><PersonDots ids={memsOf(t)} size={10} /><span className="truncate flex-1">{t.title}</span>{t.reward > 0 && <span className="text-xs text-goodink tnum">+{num(t.reward)}</span>}</div>)}
       {leader && <p className="text-sm rounded-xl px-3 py-2 flex items-center gap-2" style={{ background:'var(--t-sun)' }}><Icon name="trophy" size={16} className="text-warn" /><span>Ugens flittigste hjælper: <b className="font-semibold">{leader.m.name}</b> <span className="text-muted tnum">({leader.n})</span></span></p>}
     </Card>,
+    familiemaal: <FamGoalCard key="fm" />,
     indkoeb: <Card key="i" title="Indkøbsliste" icon="cart" tint="aqua" tab="indkoeb">
       <p className="text-sm"><span className="font-display text-2xl font-semibold tnum">{left.length}</span> <span className="text-muted">varer tilbage</span></p>
       {left.length > 0 && <p className="text-sm text-muted">{left.slice(0, 6).map(i => i.name).join(', ')}{left.length > 6 ? ` og ${left.length - 6} mere` : ''}</p>}
@@ -1023,7 +1092,7 @@ function Overblik() {
         : <p className="text-sm text-muted">Ingen datoer endnu.</p>}
     </Card>
   };
-  const order = pinned.length ? ['beskeder', 'kalender', 'mad', 'opgaver', 'indkoeb', 'foedsel'] : ['kalender', 'mad', 'opgaver', 'indkoeb', 'beskeder', 'foedsel'];
+  const order = pinned.length ? ['beskeder', 'kalender', 'mad', 'opgaver', 'familiemaal', 'indkoeb', 'foedsel'] : ['kalender', 'mad', 'opgaver', 'familiemaal', 'indkoeb', 'beskeder', 'foedsel'];
   return <div>
     <div className="flex items-center gap-4 mb-6">
       <img src={LOGO} alt="Familie J" width="64" height="64" className="rounded-[20px] shrink-0 shadow-lg" style={{ boxShadow:'var(--shadow)' }} />
@@ -1956,12 +2025,12 @@ function GoalModal({ init, onClose }) {
 }
 function Traening() {
   const { db, set } = useApp();
-  const [modal, setModal] = useState(null); const [goal, setGoal] = useState(null); const [logs, setLogs] = useState({});
+  const [modal, setModal] = useState(null); const [goal, setGoal] = useState(null); const [logs, setLogs] = useState({}); const [won, setWon] = useState(null);
   const today = dayIdx(new Date());
   const conflicts = findConflicts(db.sessions);
   const nm = id => memberFor(db, id).name;
   const newSession = day => setModal({ member:db.members[0].id, activity:'Løb', day, start:'17:00', duration:60, place:'', driver:'', note:'' });
-  const log = g => { const v = Number(logs[g.id]); if (!v) return; set('goals', l => l.map(x => x.id === g.id ? { ...x, current:Math.round((x.current + v) * 100) / 100 } : x)); setLogs(p => ({ ...p, [g.id]:'' })); };
+  const log = g => { const v = Number(logs[g.id]); if (!v) return; if (g.current < g.target && g.current + v >= g.target) setWon(g); set('goals', l => l.map(x => x.id === g.id ? { ...x, current:Math.round((x.current + v) * 100) / 100 } : x)); setLogs(p => ({ ...p, [g.id]:'' })); };
   return <div>
     <PageHead icon="dumbbell" title="Træningsplan" sub="Ugens træning, kørsel og mål samlet">
       <button className="btn btn-primary" onClick={() => newSession(today)}><Icon name="plus" size={16} />Ny træning</button>
@@ -1998,6 +2067,11 @@ function Traening() {
       {!db.goals.length && <div className="card sm:col-span-2 xl:col-span-3"><Empty icon="target" text="Ingen mål endnu. Sæt et løbe- eller styrkemål." /></div>}
     </div>
     {modal && <SessionModal init={modal} onClose={() => setModal(null)} />}
+    {won && <Modal title="Mål nået" onClose={() => setWon(null)}><div className="px-5 py-6 text-center flex flex-col gap-3">
+      <p className="text-5xl">🎖️🥳</p><p className="font-display text-2xl font-semibold">{memberFor(db, won.member).name}, du nåede dit mål!</p>
+      <p className="text-muted">{won.title} – {num(won.target)} {won.unit}. Vil du sætte et nyt mål?</p>
+      <div className="flex gap-2 justify-center"><button className="btn" onClick={() => setWon(null)}>Senere</button>
+        <button className="btn btn-primary" onClick={() => { setGoal({ member:won.member, title:'', unit:won.unit, target:Math.round(won.target * 1.5), current:0 }); setWon(null); }}>Sæt nyt mål</button></div></div></Modal>}
     {goal && <GoalModal init={goal} onClose={() => setGoal(null)} />}
   </div>;
 }
@@ -2006,7 +2080,8 @@ function Traening() {
 const CHORES_KIDS = ['Dække bord', 'Rydde af bord', 'Tømme opvasker', 'Fylde opvasker', 'Rydde værelse', 'Rede seng', 'Tage skraldet ud', 'Give hunden mad', 'Lufte hunden', 'Støvsuge eget værelse', 'Pakke skoletaske', 'Lægge vasketøj sammen', 'Vande planter', 'Tørre støv af', 'Feje køkkengulv', 'Samle legetøj op'];
 const CHORES_ADULTS = ['Lave aftensmad', 'Lave madpakker', 'Handle ind', 'Vaske tøj', 'Hænge vasketøj op', 'Stryge', 'Støvsuge', 'Vaske gulv', 'Gøre badeværelse rent', 'Skifte sengetøj', 'Rydde op i entreen', 'Tømme skraldespande', 'Rengøre køleskab', 'Bage', 'Betale regninger', 'Planlægge ugens madplan'];
 const COLS = [{ id:'todo', name:'Skal laves' }, { id:'doing', name:'I gang' }, { id:'done', name:'Færdig' }];
-const resolveWho = (members, mems) => mems.includes('all') ? members.map(m => m.id) : mems;
+const resolveWho = (members, mems) => mems.includes('all') ? members.map(m => m.id) : (mems.length ? [mems[0]] : []);
+const whoNames = (db, ids) => ids.map(x => memberFor(db, x).name).join(', ');
 
 function TaskModal({ init, onClose }) {
   const { db, set } = useApp();
@@ -2041,12 +2116,12 @@ function TaskModal({ init, onClose }) {
       </div>; })}
       {editQ && <button type="button" className="text-xs text-muted underline self-start" onClick={() => { set('choreQuick', null); }}>Gendan standardlisterne</button>}
     </div>}
-    <div><span className="lbl">Hvem?</span><MemberPick multi all value={f.assignees} onChange={v => u('assignees', v)} /><p className="text-xs text-muted mt-1.5">Vælg flere ved at trykke på dem.</p></div>
+    <div><span className="lbl">Hvem?</span><MemberPick multi all value={f.assignees} onChange={v => u('assignees', v)} /><p className="text-xs text-muted mt-1.5">{f.assignees.length > 1 && !f.assignees.includes('all') ? 'Alle de valgte kan se opgaven. Når den er færdig, vælger I, hvem der har lavet den, og kun den person får lommepengene.' : 'Vælg flere ved at trykke på dem. Er der flere, vælger I ved afkrydsning, hvem der har lavet den.'}</p></div>
     <Field label="Gentagelse"><select className="field" value={f.repeat} onChange={e => u('repeat', e.target.value)}>{REPEATS.map(r => <option key={r.id} value={r.id}>{r.id === 'none' ? 'Engangsopgave' : r.label}</option>)}</select></Field>
     <div className="rounded-2xl bg-surface2 p-3 flex flex-col gap-2.5">
       <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={f.pay} onChange={e => u('pay', e.target.checked)} />Udløser lommepenge</label>
       {f.pay && <><Field label={`Beløb pr. barn (${unit})`}><input type="number" min="0" step="any" className="field" autoFocus value={f.reward} onChange={e => u('reward', e.target.value)} placeholder="Fx 10" /></Field>
-        <p className="text-xs text-muted">Hvert barn, der er markeret på opgaven, får beløbet, når den er færdig.</p></>}
+        <p className="text-xs text-muted">Den, der har lavet opgaven, får beløbet, når den er færdig. Det gælder kun børn.</p></>}
     </div>
   </FormModal>;
 }
@@ -2069,29 +2144,30 @@ function PayModal({ member, mode, balance, onClose }) {
 function Pligter() {
   const { db, set, up, notify } = useApp();
   const [showDone, setShowDone] = useState(true); const [who, setWho] = useState('all'); const [period, setPeriod] = useState('week');
-  const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
+  const [ask, setAsk] = useState(null); const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
   const unitKr = db.rewardUnit === 'kr';
   const money = n => unitKr ? `${num(n)} kr.` : `${num(n)} point`;
   const tasks = db.tasks.filter(t => who === 'all' || inMems(memsOf(t), who));
   const kids = db.members.filter(m => m.child);
   const sumFor = (id, pos) => db.ledger.filter(l => l.member === id && (!pos || l.amount > 0)).reduce((s, l) => s + l.amount, 0);
-  const move = (task, status) => up(d => {
+  const move = (task, status, doer) => up(d => {
     const tt = d.tasks.find(x => x.id === task.id); if (!tt) return d;
     const today = iso(new Date()); const wasDone = tt.status === 'done'; let ledger = d.ledger, done = d.done, doneDate = tt.doneDate || null;
     if (wasDone && status !== 'done') { ledger = ledger.filter(l => !(l.taskId === tt.id && l.date === tt.doneDate)); done = done.filter(x => !(x.taskId === tt.id && x.date === tt.doneDate)); }
     if (status === 'done' && !wasDone) {
-      doneDate = today; const ids = resolveWho(d.members, memsOf(tt));
+      doneDate = today; const ids = doer ? [doer] : resolveWho(d.members, memsOf(tt));
       done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today }];
       if (tt.reward > 0) ledger = [...ledger, ...ids.filter(id => (d.members.find(m => m.id === id) || {}).child).map(id => ({ id:uid(), member:id, amount:tt.reward, label:tt.title, date:today, taskId:tt.id }))];
     }
     if (status !== 'done') doneDate = null;
     return { ...d, tasks:d.tasks.map(t => t.id === tt.id ? { ...t, status, doneDate } : t), ledger, done };
   });
+  const finish = t => { const m = memsOf(t); if (t.status !== 'done' && m.length > 1 && !m.includes('all')) setAsk(t); else move(t, t.status === 'done' ? 'todo' : 'done'); };
   const oneOffDone = db.tasks.filter(t => t.status === 'done' && taskRepeat(t) === 'none');
   const newTask = () => setModal({ title:'', assignees:[(kids[0] || db.members[0]).id], status:'todo', reward:0, repeat:'none' });
   const Row = ({ t }) => { const rp = taskRepeat(t); const isDone = t.status === 'done';
     return <div className="flex items-center gap-3 px-3 py-2.5 border-t border-line first:border-t-0">
-      <Check done={isDone} label={`Marker ${t.title}`} onClick={() => move(t, isDone ? 'todo' : 'done')} />
+      <Check done={isDone} label={`Marker ${t.title}`} onClick={() => finish(t)} />
       <button className="text-left min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1" onClick={() => setModal(t)}>
         <span className={`font-semibold text-sm sm:flex-1 min-w-0 ${isDone ? 'line-through text-muted' : ''}`}>{t.title}</span>
         <span className="flex flex-wrap items-center gap-1.5 shrink-0"><Who ids={memsOf(t)} small />
@@ -2160,6 +2236,12 @@ function Pligter() {
       {recent.length > 0 && <div><p className="lbl">Seneste bevægelser</p>
         <ul className="flex flex-col gap-1">{recent.map(l => <li key={l.id} className="flex items-center gap-2 text-sm"><Dot color={memberFor(db, l.member).color} size={8} /><span className="truncate flex-1">{l.label}</span><span className="text-xs text-muted tnum">{fmtShort(parse(l.date))}</span><span className={`tnum font-semibold w-16 text-right ${l.amount < 0 ? 'text-muted' : 'text-goodink'}`}>{l.amount > 0 ? '+' : ''}{num(l.amount)}</span></li>)}</ul></div>}
     </section>
+    {ask && <Modal title="Hvem har lavet opgaven?" onClose={() => setAsk(null)}>
+      <div className="px-5 py-4 flex flex-col gap-3 text-sm">
+        <p className="font-semibold">{ask.title}</p>
+        <p className="text-muted">Kun den, der har lavet opgaven, får lommepengene{ask.reward > 0 ? ` (${money(ask.reward)})` : ''}.</p>
+        <div className="flex flex-wrap gap-2">{memsOf(ask).map(id => <button key={id} className="btn" onClick={() => { move(ask, 'done', id); setAsk(null); }}><Dot color={memberFor(db, id).color} size={10} />{memberFor(db, id).name}</button>)}</div>
+      </div></Modal>}
     {modal && <TaskModal init={modal} onClose={() => setModal(null)} />}
     {pay && <PayModal {...pay} onClose={() => setPay(null)} />}
   </div>;
