@@ -1852,7 +1852,7 @@ function MealModal({ date, init, onClose }) {
     onClose();
   };
   const del = () => { const old = init; set('meals', mm => { const n = { ...mm }; delete n[date]; return n; }); onClose(); notify(`${old.dish} er fjernet`, { label:'Fortryd', fn:() => set('meals', mm => mm[date] ? mm : { ...mm, [date]:old }) }); };
-  const weekDays = Array.from({ length:7 }, (_, i) => addDays(startOfWeek(parse(date)), i));
+  const weekDays = Array.from({ length:21 }, (_, i) => addDays(addDays(startOfWeek(parse(date)), -7), i));
   return <FormModal title={`Madplan, ${fmtLong(parse(date)).toLowerCase()}`} onDelete={init && init.dish ? del : null} onClose={onClose} onSubmit={e => { e.preventDefault(); saveMeal(false); }}
     extra={ings.length > 0 ? <button type="button" className="btn" onClick={() => saveMeal(true)}><Icon name="cart" size={16} />Gem og overfør til indkøb</button> : null}>
     <div><Field label="Ret"><input className="field" autoFocus value={dish} onChange={e => onDish(e.target.value)} placeholder="Fx lasagne" autoComplete="off" /></Field>
@@ -1874,12 +1874,16 @@ function MealModal({ date, init, onClose }) {
   </FormModal>;
 }
 
-function UseRecipeModal({ recipe, days, onClose }) {
+function UseRecipeModal({ recipe, off0, onClose }) {
   const { db, set, notify } = useApp();
+  const [wo, setWo] = useState(off0); const ws = addDays(startOfWeek(new Date()), wo * 7); const days = Array.from({ length:7 }, (_, i) => addDays(ws, i));
   const pickDay = k => { set('meals', m => ({ ...m, [k]:{ dish:recipe.name, cook:(m[k] && m[k].cook) || '', ingredients:recipe.ingredients, transferred:false } })); notify(`${recipe.name} er sat på madplanen`); onClose(); };
   return <Modal title={recipe.name} onClose={onClose}>
     <div className="px-5 py-4 flex flex-col gap-3 text-sm">
       <p className="text-muted">{recipe.ingredients.join(', ')}</p>
+      <div className="flex items-center justify-between gap-2"><button type="button" className="btn btn-sm" onClick={() => setWo(o => o - 1)}><Icon name="left" size={14} />Forrige</button>
+        <span className="font-semibold text-center">Uge {isoWeek(ws)}{wo === 0 ? ' (denne uge)' : wo === 1 ? ' (næste uge)' : ''}</span>
+        <button type="button" className="btn btn-sm" onClick={() => setWo(o => o + 1)}>Næste<Icon name="right" size={14} /></button></div>
       <span className="lbl">Hvilken dag?</span>
       <div className="grid grid-cols-1 gap-1.5">{days.map(d => { const k = iso(d); const m = db.meals[k];
         return <button key={k} type="button" className="btn justify-between" onClick={() => pickDay(k)}><span>{DAYS[dayIdx(d)]} {fmtShort(d)}</span><span className="text-xs text-muted truncate">{m && m.dish ? `Erstatter: ${m.dish}` : 'Ledig'}</span></button>; })}</div>
@@ -1912,9 +1916,9 @@ function Madplan() {
   return <div>
     <PageHead icon="utensils" tint="sun" title="Madplan og opskrifter" sub={`Uge ${isoWeek(ws)} · ${fmtShort(ws)} til ${fmtShort(addDays(ws, 6))}`}>
       <div className="flex items-center gap-1">
-        <button className="iconbtn" aria-label="Forrige uge" onClick={() => setOff(o => o - 1)}><Icon name="left" /></button>
-        <button className="btn btn-sm" onClick={() => setOff(0)}>Denne uge</button>
-        <button className="iconbtn" aria-label="Næste uge" onClick={() => setOff(o => o + 1)}><Icon name="right" /></button>
+        <button className="btn btn-sm" aria-label="Forrige uge" onClick={() => setOff(o => o - 1)}><Icon name="left" size={14} />Forrige</button>
+        <button className="btn btn-sm" onClick={() => setOff(0)} disabled={off === 0}>Denne uge</button>
+        <button className="btn btn-sm btn-primary" aria-label="Næste uge" onClick={() => setOff(o => o + 1)}>Næste uge<Icon name="right" size={14} /></button>
       </div>
       <button className="btn" onClick={() => setPack(true)}><Icon name="utensils" size={16} />Madpakketjans</button>
       <button className="btn btn-primary" disabled={!pending.length} onClick={() => transfer(pending)}><Icon name="cart" size={16} />Overfør ingredienser til Indkøbsliste</button>
@@ -1962,7 +1966,7 @@ function Madplan() {
     </div>
     {edit && <MealModal date={edit} init={db.meals[edit]} onClose={() => setEdit(null)} />}
     {pack && <PackModal onClose={() => setPack(false)} />}
-    {use && <UseRecipeModal recipe={use} days={days} onClose={() => setUse(null)} />}
+    {use && <UseRecipeModal recipe={use} off0={off} onClose={() => setUse(null)} />}
   </div>;
 }
 
