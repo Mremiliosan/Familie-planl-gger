@@ -713,7 +713,7 @@ const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7
 function emptyDb() {
   return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], choreQuick:null, catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
-    sessions:[], goals:[], familyGoal:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    sessions:[], goals:[], familyGoal:null, streak:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
 }
 function seedDb() {
@@ -1028,6 +1028,58 @@ function FamGoalCard() {
   </section>;
 }
 
+/* ---------- Familie-streak (tjek ind) ---------- */
+function streakWho(db) {
+  const s = db.streak || {};
+  const ids = (s.who && s.who.length ? s.who : db.members.filter(m => m.child).map(m => m.id)).filter(id => db.members.some(m => m.id === id));
+  return ids.length ? ids : db.members.map(m => m.id);
+}
+function streakCount(db, todayK) {
+  const s = db.streak || {}; const ci = s.checkins || {}; const who = streakWho(db);
+  const full = k => who.length > 0 && who.every(id => (ci[k] || []).includes(id));
+  let d = parse(todayK); const todayDone = full(todayK); if (!todayDone) d = addDays(d, -1);
+  let n = 0; while (full(iso(d)) && n < 1000) { n++; d = addDays(d, -1); }
+  return { n, todayDone, full, who };
+}
+function StreakModal({ onClose }) {
+  const { db, set } = useApp(); const s = db.streak || {};
+  const [who, setWho] = useState(streakWho(db)); const [days, setDays] = useState(String(s.days || 7)); const [reward, setReward] = useState(s.reward || '');
+  const save = e => { e.preventDefault(); if (!who.length) return;
+    set('streak', x => ({ checkins:{}, celebrated:'', ...(x || {}), who, days:Math.max(2, Math.round(Number(days)) || 7), reward:reward.trim() })); onClose(); };
+  return <FormModal title="Familie-streak" onClose={onClose} onSubmit={save}>
+    <div><span className="lbl">Hvem skal tjekke ind hver dag?</span><MemberPick multi value={who} onChange={setWho} />
+      <p className="text-xs text-muted mt-1.5">Dagen tæller kun, hvis alle de valgte har tjekket ind.</p></div>
+    <Field label="Belønning efter hvor mange dage i træk?"><input type="number" min="2" className="field" value={days} onChange={e => setDays(e.target.value)} /></Field>
+    <Field label="Belønning (valgfri)"><input className="field" value={reward} onChange={e => setReward(e.target.value)} placeholder="Fx pizzaaften, ekstra skærmtid, bonus 20 kr." /></Field>
+  </FormModal>;
+}
+function StreakBar() {
+  const { db, set, notify } = useApp();
+  const [cfg, setCfg] = useState(false); const [party, setParty] = useState(null);
+  const todayK = iso(new Date()); const s = db.streak || {};
+  const { n, todayDone, full, who } = streakCount(db, todayK);
+  const days = s.days || 7; const today = (s.checkins || {})[todayK] || [];
+  const toggle = id => set('streak', x => { const c = { ...((x && x.checkins) || {}) }; const cur = c[todayK] || []; c[todayK] = cur.includes(id) ? cur.filter(y => y !== id) : [...cur, id]; return { days:7, reward:'', celebrated:'', ...(x || {}), checkins:c }; });
+  useEffect(() => {
+    if (todayDone && n > 0 && n % days === 0 && s.celebrated !== `${todayK}:${n}`) { setParty(n); set('streak', x => ({ ...x, celebrated:`${todayK}:${n}` })); }
+  }, [todayDone, n, days]);
+  const toGo = days - (n % days);
+  return <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+    <span className="inline-flex items-center gap-1 text-sm font-semibold rounded-full px-2.5 py-1" style={{ background:'var(--t-sun)' }} title="Dage i træk, hvor alle har tjekket ind">
+      <span aria-hidden="true">🔥</span><span className="tnum">{n}</span><span className="text-muted font-medium">{n === 1 ? 'dag' : 'dage'} i træk</span></span>
+    <span className="flex flex-wrap items-center gap-1.5">{who.map(id => { const on = today.includes(id); const m = memberFor(db, id);
+      return <button key={id} className="chip" aria-pressed={on} title={on ? `${m.name} har tjekket ind i dag (tryk for at fortryde)` : `Tryk for at tjekke ind som ${m.name}`} onClick={() => toggle(id)}>
+        {on ? <Icon name="check" size={13} /> : <Dot color={m.color} size={9} />}{m.name}</button>; })}</span>
+    <span className="text-xs text-muted">{todayDone ? (s.reward ? `Dagen er klaret ✅ Belønning om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}: ${s.reward}` : `Dagen er klaret ✅ Næste mål om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}`) : (n > 0 ? 'Tjek ind i dag for at holde jeres streak' : 'Tjek ind for at starte jeres streak')}</span>
+    <button className="iconbtn" style={{ width:26, height:26 }} aria-label="Indstil streak og belønning" onClick={() => setCfg(true)}><Icon name="pencil" size={13} /></button>
+    {cfg && <StreakModal onClose={() => setCfg(false)} />}
+    {party && <Modal title="Streak-belønning" onClose={() => setParty(null)}><div className="px-5 py-6 text-center flex flex-col gap-3">
+      <p className="text-5xl">🔥🎉</p><p className="font-display text-2xl font-semibold">{party} dage i træk!</p>
+      <p className="text-muted">{s.reward ? `Jeres belønning: ${s.reward}` : 'Flot klaret, familie! Sæt en belønning med blyanten, så der er noget at glæde sig til.'}</p>
+      <button className="btn btn-primary" onClick={() => setParty(null)}>Hurra!</button></div></Modal>}
+  </div>;
+}
+
 /* ---------- Overblik ---------- */
 function Overblik() {
   const { db, go, eventsFor, openSettings } = useApp();
@@ -1099,6 +1151,7 @@ function Overblik() {
       <div className="min-w-0">
         <p className="text-sm text-muted tnum">{fmtLong(now)} · uge {isoWeek(now)}</p>
         <h1 className="font-display text-3xl font-semibold leading-tight">{greeting(now)}, Familie J</h1>
+        <StreakBar />
       </div>
     </div>
     <div className="grid gap-4 md:grid-cols-2 items-start">{order.map(k => nodes[k])}</div>
