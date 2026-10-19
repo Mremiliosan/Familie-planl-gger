@@ -713,7 +713,7 @@ const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7
 function emptyDb() {
   return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], choreQuick:null, catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
-    sessions:[], goals:[], familyGoal:null, streak:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    sessions:[], goals:[], familyGoal:null, payRequests:[], parentWishes:[], streak:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
 }
 function seedDb() {
@@ -1152,6 +1152,7 @@ function Overblik() {
       <p className="text-sm leading-none"><span className="font-display text-xl font-semibold tnum">{openTasks.length}</span> <span className="text-muted text-xs">åbne</span></p>
       {openTasks.slice(0, 3).map(t => <div key={t.id} className="flex items-center gap-1.5 text-[13px]"><PersonDots ids={memsOf(t)} size={8} /><span className="truncate flex-1">{t.title}</span>{t.reward > 0 && <span className="text-[11px] text-goodink tnum">+{num(t.reward)}</span>}</div>)}
       {openTasks.length > 3 && <p className="text-xs text-muted">og {openTasks.length - 3} mere</p>}
+      {(() => { const me = db.members.find(m => m.id === readMe()); const n = (db.payRequests || []).length; return me && !me.child && n > 0 ? <p className="text-xs font-semibold rounded-lg px-2 py-1 flex items-center gap-1.5" style={{ background:'var(--t-sun)' }}><Icon name="wallet" size={13} className="text-warn shrink-0" />{n} {n === 1 ? 'anmodning' : 'anmodninger'} om lommepenge</p> : null; })()}
       {leader && <p className="text-xs rounded-lg px-2 py-1 flex items-center gap-1.5" style={{ background:'var(--t-sun)' }}><Icon name="trophy" size={13} className="text-warn shrink-0" /><span className="truncate"><b className="font-semibold">{leader.m.name}</b> ({leader.n}) ugens hjælper</span></p>}
     </Card>,
     indkoeb: <Card key="i" span="half" title="Indkøb" icon="cart" tint="aqua" tab="indkoeb">
@@ -2221,6 +2222,9 @@ function TaskModal({ init, onClose }) {
       {editQ && <button type="button" className="text-xs text-muted underline self-start" onClick={() => { set('choreQuick', null); }}>Gendan standardlisterne</button>}
     </div>}
     <div><span className="lbl">Hvem?</span><MemberPick multi all value={f.assignees} onChange={v => u('assignees', v)} /><p className="text-xs text-muted mt-1.5">{f.assignees.length > 1 && !f.assignees.includes('all') ? 'Alle de valgte kan se opgaven. Når den er færdig, vælger I, hvem der har lavet den, og kun den person får lommepengene.' : 'Vælg flere ved at trykke på dem. Er der flere, vælger I ved afkrydsning, hvem der har lavet den.'}</p></div>
+    {(f.assignees.includes('all') || f.assignees.some(id => { const m = db.members.find(x => x.id === id); return m && !m.child; })) && <div><span className="lbl">Størrelse (point til forældrenes belønninger)</span>
+      <div className="flex flex-wrap gap-1.5">{TASK_SIZES.map(([w, n, ex]) => <button type="button" key={w} className="chip" aria-pressed={(f.weight || 1) === w} onClick={() => u('weight', w)} title={ex}>{n} · {w} p.</button>)}</div>
+      <p className="text-xs text-muted mt-1.5">{TASK_SIZES.find(s => s[0] === (f.weight || 1))[2]}. Større opgaver giver flere point mod jeres fælles ønsker.</p></div>}
     <Field label="Gentagelse"><select className="field" value={f.repeat} onChange={e => u('repeat', e.target.value)}>{REPEATS.map(r => <option key={r.id} value={r.id}>{r.id === 'none' ? 'Engangsopgave' : r.label}</option>)}</select></Field>
     <div className="rounded-2xl bg-surface2 p-3 flex flex-col gap-2.5">
       <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={f.pay} onChange={e => u('pay', e.target.checked)} />Udløser lommepenge</label>
@@ -2230,13 +2234,14 @@ function TaskModal({ init, onClose }) {
   </FormModal>;
 }
 function PayModal({ member, mode, balance, onClose }) {
-  const { db, set } = useApp();
+  const { db, set } = useApp(); const by = readMe();
   const unit = db.rewardUnit === 'kr' ? 'kr.' : 'point';
   const [amount, setAmount] = useState(mode === 'payout' ? String(balance) : '10');
   const [label, setLabel] = useState(mode === 'payout' ? 'Udbetaling' : 'Bonus');
   const submit = e => {
     e.preventDefault(); const a = Number(amount); if (!a || a <= 0) return;
-    set('ledger', l => [...l, { id:uid(), member, amount:mode === 'payout' ? -a : a, label:label.trim() || (mode === 'payout' ? 'Udbetaling' : 'Bonus'), date:iso(new Date()), taskId:null }]);
+    set('ledger', l => [...l, { id:uid(), member, amount:mode === 'payout' ? -a : a, label:label.trim() || (mode === 'payout' ? 'Udbetaling' : 'Bonus'), date:iso(new Date()), taskId:null, by }]);
+    if (mode === 'payout') set('payRequests', l => (l || []).filter(r => r.member !== member));
     onClose();
   };
   return <FormModal title={`${mode === 'payout' ? 'Udbetal til' : 'Giv bonus til'} ${memberFor(db, member).name}`} onClose={onClose} onSubmit={submit} submitLabel={mode === 'payout' ? 'Udbetal' : 'Giv bonus'}>
@@ -2245,9 +2250,78 @@ function PayModal({ member, mode, balance, onClose }) {
   </FormModal>;
 }
 
+function RequestModal({ member, balance, onClose }) {
+  const { db, set, notify } = useApp(); const unit = db.rewardUnit === 'kr' ? 'kr.' : 'point'; const money = n => `${num(n)} ${unit}`;
+  const [amount, setAmount] = useState(String(balance));
+  const submit = e => { e.preventDefault(); const a = Math.min(balance, Number(amount)); if (!(a > 0)) return;
+    set('payRequests', l => [...(l || []).filter(r => r.member !== member), { id:uid(), member, amount:a, date:iso(new Date()) }]);
+    onClose(); notify('Din anmodning er sendt til mor og far'); };
+  return <FormModal title="Anmod om udbetaling" onClose={onClose} onSubmit={submit} submitLabel="Send anmodning">
+    <p className="text-sm text-muted">Mor eller far ser din anmodning og udbetaler pengene. Du har {money(balance)} til gode.</p>
+    <Field label={`Hvor meget vil du have udbetalt (${unit})?`}><input type="number" min="1" max={balance} step="any" className="field" autoFocus value={amount} onChange={e => setAmount(e.target.value)} /></Field>
+  </FormModal>;
+}
+
+/* ---------- Forældrenes belønninger (kun synlig for voksne) ---------- */
+const TASK_SIZES = [[1, 'Lille', 'fx tøm opvasker'], [3, 'Mellem', 'fx støvsug'], [5, 'Stor', 'fx gør badeværelset rent'], [10, 'Kæmpe', 'fx hele huset']];
+const WISH_QUICK = ['Filmaften', 'Massage', 'Hotelophold', 'Middag ude', 'Sovemorgen', 'Date night', 'Spa-dag'];
+function wishProgress(db, w) {
+  const adults = db.members.filter(m => !m.child).map(m => m.id);
+  const owners = w.owner === 'shared' ? adults : [w.owner];
+  return db.done.filter(x => x.date >= w.created && (x.who || []).some(id => owners.includes(id))).reduce((s, x) => s + (x.pts || 1), 0);
+}
+function WishModal({ init, onClose }) {
+  const { db, set } = useApp(); const adults = db.members.filter(m => !m.child);
+  const [f, setF] = useState({ owner:adults[0] ? adults[0].id : 'shared', title:'', target:20, giver:'', ...init }); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const giverOpts = f.owner === 'shared' ? [] : adults.filter(a => a.id !== f.owner);
+  const submit = e => { e.preventDefault(); if (!f.title.trim()) return;
+    const w = { ...f, title:f.title.trim(), target:Math.max(1, Math.round(Number(f.target)) || 1), giver:f.owner === 'shared' ? '' : (f.giver || (giverOpts[0] ? giverOpts[0].id : '')) };
+    if (w.id) set('parentWishes', l => (l || []).map(x => x.id === w.id ? w : x)); else set('parentWishes', l => [...(l || []), { ...w, id:uid(), created:iso(new Date()), redeemed:'' }]);
+    onClose(); };
+  const del = () => { set('parentWishes', l => (l || []).filter(x => x.id !== f.id)); onClose(); };
+  return <FormModal title={f.id ? 'Redigér ønske' : 'Nyt ønske'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
+    <div><span className="lbl">Hvem optjener det?</span><div className="flex flex-wrap gap-1.5">
+      {adults.map(a => <button type="button" key={a.id} className="chip" aria-pressed={f.owner === a.id} onClick={() => { u('owner', a.id); u('giver', ''); }}><Dot color={a.color} size={9} />{a.name}</button>)}
+      <button type="button" className="chip" aria-pressed={f.owner === 'shared'} onClick={() => u('owner', 'shared')}>Begge sammen</button></div></div>
+    <div><Field label="Hvad skal der optjenes til?"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx massage, filmaften eller hotelophold" /></Field>
+      <div className="flex flex-wrap gap-1.5 mt-2">{WISH_QUICK.map(q => <button type="button" key={q} className="chip" onClick={() => u('title', q)}>{q}</button>)}</div></div>
+    <Field label="Hvor mange point skal der til?"><input type="number" min="1" className="field" value={f.target} onChange={e => u('target', e.target.value)} /></Field>
+    {giverOpts.length > 0 && <div><span className="lbl">Hvem leverer ønsket?</span><div className="flex flex-wrap gap-1.5">
+      {giverOpts.map(a => <button type="button" key={a.id} className="chip" aria-pressed={(f.giver || giverOpts[0].id) === a.id} onClick={() => u('giver', a.id)}><Dot color={a.color} size={9} />{a.name}</button>)}</div></div>}
+    <p className="text-xs text-muted">Opgaver giver point efter størrelse: Lille 1, Mellem 3, Stor 5, Kæmpe 10 (vælges på opgaven). Tip: 20 point svarer til fx 10 små og 2 store opgaver. Alt, den optjenende løser fra i dag, tæller med. Når målet er nået, kan I markere ønsket som leveret.</p>
+  </FormModal>;
+}
+function ParentWishes() {
+  const { db, set, notify } = useApp(); const [edit, setEdit] = useState(null); const [showHist, setShowHist] = useState(false);
+  const wishes = db.parentWishes || []; const active = wishes.filter(w => !w.redeemed); const hist = wishes.filter(w => w.redeemed).sort((a, b) => b.redeemed.localeCompare(a.redeemed));
+  const nm = id => id === 'shared' ? 'Begge' : memberFor(db, id).name;
+  const deliver = w => { set('parentWishes', l => l.map(x => x.id === w.id ? { ...x, redeemed:iso(new Date()) } : x)); notify(`${w.title} er markeret som leveret 🎉`, { label:'Fortryd', fn:() => set('parentWishes', l => l.map(x => x.id === w.id ? { ...x, redeemed:'' } : x)) }); };
+  return <div>
+    <div className="flex items-center justify-between gap-2 mb-2"><p className="lbl mb-0">Forældrenes belønninger <span className="normal-case font-medium text-muted">(kun synlig for voksne)</span></p>
+      <button className="btn btn-sm" onClick={() => setEdit({})}><Icon name="plus" size={14} />Nyt ønske</button></div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {active.map(w => { const n = wishProgress(db, w); const pct = Math.min(100, Math.round(n / w.target * 100)); const ok = n >= w.target;
+        return <div key={w.id} className="rounded-2xl bg-surface2 p-4 flex flex-col gap-2 min-w-0">
+          <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold flex items-center gap-1.5"><Icon name="gift" size={15} className="text-accent shrink-0" /><span className="truncate">{w.title}</span></p>
+            <p className="text-xs text-muted">{w.owner === 'shared' ? 'Optjenes af jer begge sammen' : `${nm(w.owner)} optjener`}{w.giver ? ` · ${nm(w.giver)} leverer` : ''}</p></div>
+            <button className="iconbtn" aria-label="Redigér ønske" onClick={() => setEdit(w)}><Icon name="pencil" size={15} /></button></div>
+          <div className="flex items-baseline justify-between text-sm"><span className="tnum"><b className="font-display text-xl">{n}</b> / {w.target} point</span><span className="tnum text-muted">{pct}%</span></div>
+          <div className="h-2.5 rounded-full bg-surface overflow-hidden"><div className="h-full rounded-full" style={{ width:pct + '%', background:ok ? 'var(--good)' : 'var(--accent)' }} /></div>
+          {ok && <div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold text-goodink">🎉 Optjent!{w.giver ? ` ${nm(w.giver)} leverer` : ''}</span><button className="btn btn-sm btn-primary" onClick={() => deliver(w)}>Markér som leveret</button></div>}
+        </div>; })}
+      {!active.length && <p className="text-sm text-muted sm:col-span-2">Ingen ønsker endnu. Tryk "Nyt ønske", fx massage, filmaften eller et hotelophold.</p>}
+    </div>
+    {hist.length > 0 && <div className="mt-2"><button className="btn btn-sm btn-ghost" onClick={() => setShowHist(v => !v)}>{showHist ? 'Skjul' : 'Vis'} leverede ønsker ({hist.length})</button>
+      {showHist && <ul className="flex flex-col gap-1 mt-1">{hist.map(w => <li key={w.id} className="flex items-center gap-2 text-sm"><Icon name="check" size={14} className="text-good shrink-0" /><span className="truncate flex-1">{w.title} <span className="text-muted">· {nm(w.owner)}{w.giver ? ` → ${nm(w.giver)}` : ''}</span></span><span className="text-xs text-muted tnum">{fmtShort(parse(w.redeemed))}</span></li>)}</ul>}</div>}
+    {edit && <WishModal init={edit} onClose={() => setEdit(null)} />}
+  </div>;
+}
+
 function Pligter() {
   const { db, set, up, notify } = useApp();
   const [showDone, setShowDone] = useState(true); const [who, setWho] = useState('all'); const [period, setPeriod] = useState('week');
+  const meId = readMe(); const meM = db.members.find(m => m.id === meId); const canPay = !!meM && !meM.child; const [reqM, setReqM] = useState(null); const [hist, setHist] = useState('all');
+  const requests = db.payRequests || [];
   const [ask, setAsk] = useState(null); const [doers, setDoers] = useState([]); const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
   const unitKr = db.rewardUnit === 'kr';
   const money = n => unitKr ? `${num(n)} kr.` : `${num(n)} point`;
@@ -2260,7 +2334,7 @@ function Pligter() {
     if (wasDone && status !== 'done') { ledger = ledger.filter(l => !(l.taskId === tt.id && l.date === tt.doneDate)); done = done.filter(x => !(x.taskId === tt.id && x.date === tt.doneDate)); }
     if (status === 'done' && !wasDone) {
       doneDate = today; const ids = doer ? [].concat(doer) : resolveWho(d.members, memsOf(tt));
-      done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today }];
+      done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today, pts:tt.weight || 1 }];
       if (tt.reward > 0) { const kidIds = ids.filter(id => (d.members.find(m => m.id === id) || {}).child); const share = Math.round(tt.reward / Math.max(1, ids.length) * 100) / 100; ledger = [...ledger, ...kidIds.map(id => ({ id:uid(), member:id, amount:share, label:tt.title, date:today, taskId:tt.id }))]; }
     }
     if (status !== 'done') doneDate = null;
@@ -2275,6 +2349,7 @@ function Pligter() {
       <button className="text-left min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1" onClick={() => setModal(t)}>
         <span className={`font-semibold text-sm sm:flex-1 min-w-0 ${isDone ? 'line-through text-muted' : ''}`}>{t.title}</span>
         <span className="flex flex-wrap items-center gap-1.5 shrink-0"><Who ids={memsOf(t)} small />
+          {(t.weight || 1) > 1 && memsOf(t).some(id => id === 'all' || !((db.members.find(m => m.id === id) || {}).child)) && <span className="inline-flex items-center text-xs text-muted tnum">⭐{t.weight}</span>}
           {t.reward > 0 && <span className="inline-flex items-center rounded-full bg-goodsoft text-goodink text-xs font-semibold px-2 py-0.5 tnum">+{money(t.reward)}</span>}
           {rp !== 'none' && <span className="inline-flex items-center gap-1 text-xs text-muted"><Icon name="repeat" size={12} />{repeatLabel(rp)}</span>}</span>
       </button></div>; };
@@ -2334,9 +2409,28 @@ function Pligter() {
             <div className="flex items-center justify-between gap-2"><Who id={k.id} /><Icon name="wallet" className="text-muted" /></div>
             <div><p className="text-xs text-muted">Til gode</p><p className="font-display text-3xl font-semibold tnum">{money(bal)}</p>
               <p className="text-xs text-muted tnum">Optjent i alt: {money(sumFor(k.id, true))}</p></div>
-            <div className="flex gap-2"><button className="btn btn-sm btn-primary" disabled={bal <= 0} onClick={() => setPay({ member:k.id, mode:'payout', balance:bal })}>Udbetal</button>
-              <button className="btn btn-sm" onClick={() => setPay({ member:k.id, mode:'bonus', balance:0 })}>Giv bonus</button></div>
+            {(() => { const rq = requests.find(r => r.member === k.id);
+              return <>
+                {rq && <p className="text-xs font-semibold rounded-lg px-2.5 py-1.5 flex items-center gap-1.5" style={{ background:'var(--t-sun)' }}><Icon name="bell" size={13} className="text-warn shrink-0" />Anmoder om {money(rq.amount)} udbetalt</p>}
+                {canPay ? <div className="flex gap-2"><button className="btn btn-sm btn-primary" disabled={bal <= 0} onClick={() => setPay({ member:k.id, mode:'payout', balance:rq ? Math.min(rq.amount, bal) : bal })}>Udbetal</button>
+                  <button className="btn btn-sm" onClick={() => setPay({ member:k.id, mode:'bonus', balance:0 })}>Giv bonus</button></div>
+                  : meId === k.id ? (rq ? <div className="flex gap-2 items-center"><span className="text-xs text-muted">Anmodning sendt ✓</span><button className="btn btn-sm" onClick={() => set('payRequests', l => (l || []).filter(r => r.member !== k.id))}>Træk tilbage</button></div>
+                    : <button className="btn btn-sm btn-primary self-start" disabled={bal <= 0} onClick={() => setReqM({ member:k.id, balance:bal })}>Anmod om udbetaling</button>)
+                  : <p className="text-xs text-muted">{meM ? 'Kun mor og far kan udbetale.' : 'Vælg profil på forsiden for at udbetale eller anmode.'}</p>}
+              </>; })()}
           </div>; })}</div></div>}
+      {(() => { const pays = db.ledger.filter(l => l.amount < 0 && (hist === 'all' || l.member === hist)).sort((a, b) => b.date.localeCompare(a.date));
+        const total = pays.reduce((s, l) => s - l.amount, 0); const byMonth = {}; pays.forEach(l => { const k = l.date.slice(0, 7); (byMonth[k] = byMonth[k] || []).push(l); });
+        return <div><p className="lbl">Udbetalingshistorik</p>
+          <div className="flex flex-wrap items-center gap-1.5 mb-2"><button className="chip" aria-pressed={hist === 'all'} onClick={() => setHist('all')}>Alle</button>
+            {kids.map(k => <button key={k.id} className="chip" aria-pressed={hist === k.id} onClick={() => setHist(k.id)}><Dot color={k.color} size={9} />{k.name}</button>)}
+            <span className="ml-auto text-sm tnum text-muted">Udbetalt i alt: <b className="text-ink">{money(total)}</b></span></div>
+          {pays.length === 0 ? <p className="text-sm text-muted">Ingen udbetalinger endnu.</p> :
+            Object.keys(byMonth).sort().reverse().map(mk => { const l = byMonth[mk]; const d = parse(mk + '-01');
+              return <div key={mk} className="mb-2"><p className="text-xs font-bold uppercase tracking-wider text-muted flex justify-between"><span>{MONTHS[d.getMonth()]} {d.getFullYear()}</span><span className="tnum">{money(l.reduce((s, x) => s - x.amount, 0))}</span></p>
+                <ul className="flex flex-col gap-1 mt-1">{l.map(x => <li key={x.id} className="flex items-center gap-2 text-sm"><Dot color={memberFor(db, x.member).color} size={8} /><span className="truncate flex-1">{memberFor(db, x.member).name}{x.by && db.members.some(m => m.id === x.by) ? <span className="text-muted"> · af {memberFor(db, x.by).name}</span> : null}</span><span className="text-xs text-muted tnum">{fmtShort(parse(x.date))}</span><span className="tnum font-semibold w-20 text-right">{money(-x.amount)}</span></li>)}</ul></div>; })}
+        </div>; })()}
+      {canPay && <ParentWishes />}
       {recent.length > 0 && <div><p className="lbl">Seneste bevægelser</p>
         <ul className="flex flex-col gap-1">{recent.map(l => <li key={l.id} className="flex items-center gap-2 text-sm"><Dot color={memberFor(db, l.member).color} size={8} /><span className="truncate flex-1">{l.label}</span><span className="text-xs text-muted tnum">{fmtShort(parse(l.date))}</span><span className={`tnum font-semibold w-16 text-right ${l.amount < 0 ? 'text-muted' : 'text-goodink'}`}>{l.amount > 0 ? '+' : ''}{num(l.amount)}</span></li>)}</ul></div>}
     </section>
@@ -2350,6 +2444,7 @@ function Pligter() {
           <button className="btn btn-primary" disabled={!doers.length} onClick={() => { move(ask, 'done', doers); setAsk(null); }}>Færdig</button></div>
       </div></Modal>}
     {modal && <TaskModal init={modal} onClose={() => setModal(null)} />}
+    {reqM && <RequestModal {...reqM} onClose={() => setReqM(null)} />}
     {pay && <PayModal {...pay} onClose={() => setPay(null)} />}
   </div>;
 }
