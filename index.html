@@ -346,7 +346,7 @@ const daysBetween = (a, b) => Math.round((Date.UTC(b.getFullYear(), b.getMonth()
 function occursOn(e, k) {
   if (e.skip && e.skip.includes(k)) return false;
   const rp = e.repeat || 'none';
-  if (rp === 'none') return e.date === k;
+  if (rp === 'none') return e.endDate && e.endDate > e.date ? (k >= e.date && k <= e.endDate) : e.date === k;
   if (k < e.date || (e.until && k > e.until)) return false;
   const a = parse(e.date), b = parse(k), diff = daysBetween(a, b);
   if (rp === 'weekly') return diff % 7 === 0;
@@ -1111,7 +1111,7 @@ function EventModal({ init, onClose }) {
   const { set, notify } = useApp();
   const [f, setF] = useState({ repeat:'none', until:'', skip:[], ...init, members:memsOf(init).length ? memsOf(init) : ['all'] });
   const u = (k, v) => setF(p => ({ ...p, [k]:v }));
-  const clean = () => { const { occ, ...rest } = f; const mems = f.members.length ? f.members : ['all']; return { ...rest, title:f.title.trim(), members:mems, member:mems[0], until:f.repeat === 'none' ? '' : f.until }; };
+  const clean = () => { const { occ, ...rest } = f; const mems = f.members.length ? f.members : ['all']; return { ...rest, title:f.title.trim(), members:mems, member:mems[0], until:f.repeat === 'none' ? '' : f.until, endDate:f.repeat === 'none' && f.endDate && f.endDate > f.date ? f.endDate : '' }; };
   const submit = e => {
     e.preventDefault(); if (!f.title.trim()) return;
     const ev = clean();
@@ -1126,6 +1126,7 @@ function EventModal({ init, onClose }) {
     <Field label="Titel"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx tandlæge" /></Field>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <Field label={rep ? 'Første dato' : 'Dato'}><input type="date" className="field" value={f.date} onChange={e => u('date', e.target.value)} required /></Field>
+      {!rep && <Field label="Slutdato (valgfri)" className="sm:col-span-3"><input type="date" className="field" min={f.date} value={f.endDate || ''} onChange={e => u('endDate', e.target.value)} /><span className="text-xs text-muted block mt-1">Til ferie, weekendophold osv. Lad feltet stå tomt, hvis aftalen slutter samme dag.</span></Field>}
       <Field label="Fra"><input type="time" className="field" value={f.start} onChange={e => u('start', e.target.value)} /></Field>
       <Field label="Til"><input type="time" className="field" value={f.end} onChange={e => u('end', e.target.value)} /></Field>
     </div>
@@ -1149,7 +1150,7 @@ function Kalender() {
   const today = iso(new Date()); const filter = ui.calFilter; const view = ui.calView;
   const eventsOn = k => eventsFor(k).filter(e => filter === 'all' || inMems(e.members, filter)).sort(byTime);
   const trainOn = k => ui.showTraining ? db.sessions.filter(s => sessionOn(s, k) && (filter === 'all' || s.member === filter)).sort((a, b) => a.start.localeCompare(b.start)) : [];
-  const newEv = date => setModal({ title:'', date, start:'', end:'', members:filter === 'all' ? ['all'] : [filter], note:'', repeat:'none' });
+  const newEv = date => setModal({ title:'', date, endDate:'', start:'', end:'', members:filter === 'all' ? ['all'] : [filter], note:'', repeat:'none' });
   const openEv = e => { if (e.ext) { setExtEv(e); return; } const base = db.events.find(x => x.id === e.id); if (base) setModal({ ...base, occ:e.date }); };
   const shift = n => setCursor(c => view === 'month' ? new Date(c.getFullYear(), c.getMonth() + n, 1) : addDays(c, 7 * n));
   const soon = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, startOfDay(new Date()), b.noYear) })).filter(x => x.days <= 7).sort((a, b) => a.days - b.days);
@@ -2444,7 +2445,8 @@ function App() {
   }, [ext.data, db.feedMap, db.feedHidden, db.feedOverride, db.extFeeds, appFeeds.byFeed]);
   const seriesCount = sk => seriesCounts[sk] || 0;
   const eventsFor = k => [
-    ...db.events.filter(e => occursOn(e, k)).map(e => ({ ...e, date:k, members:memsOf(e), seriesDate:e.date })),
+    ...db.events.filter(e => occursOn(e, k)).map(e => { const multi = (e.repeat || 'none') === 'none' && e.endDate && e.endDate > e.date; const n = multi ? daysBetween(parse(e.date), parse(e.endDate)) + 1 : 0; const i = multi ? daysBetween(parse(e.date), parse(k)) + 1 : 0;
+      return { ...e, date:k, members:memsOf(e), seriesDate:e.date, title:multi ? `${e.title} (dag ${i}/${n})` : e.title, start:multi && i > 1 ? '' : e.start, end:multi && i < n ? '' : e.end }; }),
     ...(extByDate[k] || [])
   ];
 
