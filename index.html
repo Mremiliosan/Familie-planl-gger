@@ -1034,7 +1034,7 @@ function Overblik() {
   const [pack, setPack] = useState(false);
   const now = new Date(); const t0 = startOfDay(now); const today = iso(now); const di = dayIdx(now);
   const evs = eventsFor(today).sort(byTime);
-  const trains = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
+  const trains = db.sessions.filter(s => sessionOn(s, today)).sort((a, b) => a.start.localeCompare(b.start));
   const upcoming = Array.from({ length:7 }, (_, i) => iso(addDays(t0, i + 1))).flatMap(k => eventsFor(k).sort(byTime).map(e => ({ ...e, dk:k }))).slice(0, 4);
   const meal = db.meals[today];
   const bds = db.birthdays.map(b => ({ b, ...nextBirthday(b.date, t0, b.noYear) })).sort((a, b) => a.days - b.days).slice(0, 3);
@@ -1148,7 +1148,7 @@ function Kalender() {
   const [modal, setModal] = useState(null); const [extEv, setExtEv] = useState(null);
   const today = iso(new Date()); const filter = ui.calFilter; const view = ui.calView;
   const eventsOn = k => eventsFor(k).filter(e => filter === 'all' || inMems(e.members, filter)).sort(byTime);
-  const trainOn = k => ui.showTraining ? db.sessions.filter(s => s.day === dayIdx(parse(k)) && (filter === 'all' || s.member === filter)).sort((a, b) => a.start.localeCompare(b.start)) : [];
+  const trainOn = k => ui.showTraining ? db.sessions.filter(s => sessionOn(s, k) && (filter === 'all' || s.member === filter)).sort((a, b) => a.start.localeCompare(b.start)) : [];
   const newEv = date => setModal({ title:'', date, start:'', end:'', members:filter === 'all' ? ['all'] : [filter], note:'', repeat:'none' });
   const openEv = e => { if (e.ext) { setExtEv(e); return; } const base = db.events.find(x => x.id === e.id); if (base) setModal({ ...base, occ:e.date }); };
   const shift = n => setCursor(c => view === 'month' ? new Date(c.getFullYear(), c.getMonth() + n, 1) : addDays(c, 7 * n));
@@ -1721,6 +1721,13 @@ function Indkoeb() {
   useEffect(() => () => clearInterval(timer.current), []);
   const items = db.shopping; const checked = !!db.dealsCheckedAt;
   const left = items.filter(i => !i.done);
+  const clearAll = () => {
+    if (!confirm(`Ryd hele indkøbslisten (${items.length} ${items.length === 1 ? 'vare' : 'varer'})?`)) return;
+    const oldList = db.shopping, oldMeals = db.meals;
+    const meals = {}; Object.keys(oldMeals).forEach(k => { meals[k] = oldMeals[k] && oldMeals[k].transferred ? { ...oldMeals[k], transferred:false } : oldMeals[k]; });
+    set('shopping', []); set('meals', meals);
+    notify('Indkøbslisten er ryddet', { label:'Fortryd', fn:() => { set('shopping', oldList); set('meals', oldMeals); } });
+  };
   const add = (n, c, w) => {
     const nm = n.trim(); if (!nm) return;
     if (items.some(i => !i.done && i.name.toLowerCase() === nm.toLowerCase())) { notify(`${nm} står allerede på listen`); return; }
@@ -1786,6 +1793,7 @@ function Indkoeb() {
         return <button key={n} className="chip" disabled={on} style={{ opacity:on ? .5 : 1 }} onClick={() => add(n, c)}>{on ? <Icon name="check" size={13} /> : <Icon name="plus" size={13} />}{n}</button>; })}</div>
     </div>
     {groups.length === 0 && <div className="card"><Empty icon="cart" text="Listen er tom. Tilføj varer ovenfor eller brug hurtig-tilføj." /></div>}
+    {items.length > 0 && <div className="mb-4 flex justify-end"><button className="btn btn-sm btn-danger" onClick={clearAll}><Icon name="trash" size={14} />Ryd hele indkøbslisten</button></div>}
     {dupes > 0 && <div className="rounded-2xl px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-2 text-sm" style={{ background:'var(--t-sun)' }}>
       <span className="flex items-center gap-2"><Icon name="sparkles" size={16} className="text-warn" />{dupes} {dupes === 1 ? 'vare står' : 'varer står'} på flere linjer. Fx samme krydderi to gange.</span>
       <button className="btn btn-sm" onClick={collapse}>Saml ens varer</button></div>}
@@ -1971,6 +1979,9 @@ function Madplan() {
 }
 
 /* ---------- Træning ---------- */
+// Engangstræning har en dato (s.date); ugentlig har kun ugedag (s.day). Ældre træninger uden dato er ugentlige.
+function sessionOn(s, k) { return s.date ? s.date === k : s.day === dayIdx(parse(k)); }
+function nextDateFor(day) { const t = iso(new Date()); let d = iso(addDays(startOfWeek(new Date()), day)); if (d < t) d = iso(addDays(parse(d), 7)); return d; }
 function findConflicts(sessions) {
   const out = [];
   for (let day = 0; day < 7; day++) {
@@ -1987,10 +1998,12 @@ function findConflicts(sessions) {
 }
 function SessionModal({ init, onClose }) {
   const { set } = useApp();
-  const [f, setF] = useState(init); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
+  const [f, setF] = useState({ ...init, weekly:init.id ? !init.date : !!init.weekly, date:init.date || nextDateFor(init.day) }); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
   const submit = e => {
     e.preventDefault();
-    const s = { ...f, duration:Math.max(5, Number(f.duration) || 60) };
+    const { weekly, ...rest } = f;
+    const s = { ...rest, duration:Math.max(5, Number(f.duration) || 60) };
+    if (weekly) delete s.date; else { if (!s.date) return; s.day = dayIdx(parse(s.date)); }
     if (s.id) set('sessions', l => l.map(x => x.id === s.id ? s : x)); else set('sessions', l => [...l, { ...s, id:uid() }]);
     onClose();
   };
@@ -1999,10 +2012,13 @@ function SessionModal({ init, onClose }) {
     <div><span className="lbl">Hvem træner</span><MemberPick value={f.member} onChange={v => u('member', v)} /></div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <Field label="Aktivitet"><select className="field" value={f.activity} onChange={e => u('activity', e.target.value)}>{ACTIVITIES.map(a => <option key={a}>{a}</option>)}</select></Field>
-      <Field label="Ugedag"><select className="field" value={f.day} onChange={e => u('day', Number(e.target.value))}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></Field>
+      {f.weekly ? <Field label="Ugedag"><select className="field" value={f.day} onChange={e => u('day', Number(e.target.value))}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></Field>
+        : <Field label="Dato"><input type="date" className="field" value={f.date} onChange={e => u('date', e.target.value)} required /></Field>}
       <Field label="Starter"><input type="time" className="field" value={f.start} onChange={e => u('start', e.target.value)} required /></Field>
       <Field label="Varighed (minutter)"><input type="number" min="5" step="5" className="field" value={f.duration} onChange={e => u('duration', e.target.value)} /></Field>
     </div>
+    <div><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={f.weekly} onChange={e => u('weekly', e.target.checked)} /><span>Gentag hver uge</span></label>
+      {!f.weekly && <p className="text-xs text-muted mt-1">Uden gentagelse forsvinder træningen, når datoen er overstået.</p>}</div>
     <Field label="Sted"><input className="field" value={f.place} onChange={e => u('place', e.target.value)} placeholder="Fx stadion" /></Field>
     <div><span className="lbl">Hvem kører eller passer</span><MemberPick none="Ingen kørsel" value={f.driver} onChange={v => u('driver', v)} /></div>
   </FormModal>;
@@ -2031,9 +2047,12 @@ function Traening() {
   const { db, set } = useApp();
   const [modal, setModal] = useState(null); const [goal, setGoal] = useState(null); const [logs, setLogs] = useState({}); const [won, setWon] = useState(null);
   const today = dayIdx(new Date());
-  const conflicts = findConflicts(db.sessions);
+  const todayK = iso(new Date()); const wk0 = iso(startOfWeek(new Date())); const wk6 = iso(addDays(startOfWeek(new Date()), 6));
+  const weekSessions = db.sessions.filter(s => !s.date || (s.date >= todayK && s.date >= wk0 && s.date <= wk6));
+  useEffect(() => { if (db.sessions.some(s => s.date && s.date < todayK)) set('sessions', l => l.filter(s => !s.date || s.date >= todayK)); }, [todayK, db.sessions.length]);
+  const conflicts = findConflicts(weekSessions);
   const nm = id => memberFor(db, id).name;
-  const newSession = day => setModal({ member:db.members[0].id, activity:'Løb', day, start:'17:00', duration:60, place:'', driver:'', note:'' });
+  const newSession = day => setModal({ weekly:false, member:db.members[0].id, activity:'Løb', day, start:'17:00', duration:60, place:'', driver:'', note:'' });
   const log = g => { const v = Number(logs[g.id]); if (!v) return; if (g.current < g.target && g.current + v >= g.target) setWon(g); set('goals', l => l.map(x => x.id === g.id ? { ...x, current:Math.round((x.current + v) * 100) / 100 } : x)); setLogs(p => ({ ...p, [g.id]:'' })); };
   return <div>
     <PageHead icon="dumbbell" title="Træningsplan" sub="Ugens træning, kørsel og mål samlet">
@@ -2043,14 +2062,14 @@ function Traening() {
       <Icon name="alert" className="text-warn mt-0.5" /><div className="text-sm"><p className="font-semibold">Logistik overlapper</p>
         {conflicts.map((c, i) => <p key={i} className="text-muted">{DAYS[c.day]}: {c.kind === 'driver' ? `${nm(c.who)} skal køre til både ${c.a.activity} (${nm(c.a.member)}) og ${c.b.activity} (${nm(c.b.member)})` : `${nm(c.who)} har to aktiviteter samtidig`} omkring {c.b.start}.</p>)}</div></div>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-8">
-      {DAYS.map((dn, di) => { const l = db.sessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
+      {DAYS.map((dn, di) => { const l = weekSessions.filter(s => s.day === di).sort((a, b) => a.start.localeCompare(b.start));
         return <section key={dn} className={`card p-3 flex flex-col gap-2 min-w-0 ${di === today ? 'ring-2 ring-accent' : ''}`}>
           <div className="flex items-center justify-between"><h3 className="font-display font-semibold">{dn}</h3>
             <button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Tilføj træning ${dn}`} onClick={() => newSession(di)}><Icon name="plus" size={16} /></button></div>
           {l.map(s => { const m = memberFor(db, s.member); const bad = conflicts.some(c => c.a.id === s.id || c.b.id === s.id);
             return <button key={s.id} onClick={() => setModal(s)} className="text-left rounded-lg px-2.5 py-2 min-w-0 hover:brightness-95" style={{ background:soft(m.color), outline:bad ? '2px solid var(--warn)' : 'none' }}>
               <span className="flex items-center justify-between gap-2"><span className="font-semibold text-sm truncate">{s.activity}</span><span className="tnum text-xs text-muted shrink-0">{s.start}</span></span>
-              <span className="block text-xs text-muted truncate">{m.name}{s.place ? ` · ${s.place}` : ''} · {s.duration} min</span>
+              <span className="block text-xs text-muted truncate">{m.name}{s.place ? ` · ${s.place}` : ''} · {s.duration} min{!s.date ? ' · hver uge' : ''}</span>
               {s.driver && <span className="flex items-center gap-1 text-xs text-muted mt-0.5"><Icon name="car" size={12} />{nm(s.driver)} kører</span>}
             </button>; })}
           {!l.length && <p className="text-sm text-muted">Hviledag</p>}
@@ -2148,7 +2167,7 @@ function PayModal({ member, mode, balance, onClose }) {
 function Pligter() {
   const { db, set, up, notify } = useApp();
   const [showDone, setShowDone] = useState(true); const [who, setWho] = useState('all'); const [period, setPeriod] = useState('week');
-  const [ask, setAsk] = useState(null); const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
+  const [ask, setAsk] = useState(null); const [doers, setDoers] = useState([]); const [modal, setModal] = useState(null); const [pay, setPay] = useState(null);
   const unitKr = db.rewardUnit === 'kr';
   const money = n => unitKr ? `${num(n)} kr.` : `${num(n)} point`;
   const tasks = db.tasks.filter(t => who === 'all' || inMems(memsOf(t), who));
@@ -2159,14 +2178,14 @@ function Pligter() {
     const today = iso(new Date()); const wasDone = tt.status === 'done'; let ledger = d.ledger, done = d.done, doneDate = tt.doneDate || null;
     if (wasDone && status !== 'done') { ledger = ledger.filter(l => !(l.taskId === tt.id && l.date === tt.doneDate)); done = done.filter(x => !(x.taskId === tt.id && x.date === tt.doneDate)); }
     if (status === 'done' && !wasDone) {
-      doneDate = today; const ids = doer ? [doer] : resolveWho(d.members, memsOf(tt));
+      doneDate = today; const ids = doer ? [].concat(doer) : resolveWho(d.members, memsOf(tt));
       done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today }];
-      if (tt.reward > 0) ledger = [...ledger, ...ids.filter(id => (d.members.find(m => m.id === id) || {}).child).map(id => ({ id:uid(), member:id, amount:tt.reward, label:tt.title, date:today, taskId:tt.id }))];
+      if (tt.reward > 0) { const kidIds = ids.filter(id => (d.members.find(m => m.id === id) || {}).child); const share = Math.round(tt.reward / Math.max(1, ids.length) * 100) / 100; ledger = [...ledger, ...kidIds.map(id => ({ id:uid(), member:id, amount:share, label:tt.title, date:today, taskId:tt.id }))]; }
     }
     if (status !== 'done') doneDate = null;
     return { ...d, tasks:d.tasks.map(t => t.id === tt.id ? { ...t, status, doneDate } : t), ledger, done };
   });
-  const finish = t => { const m = memsOf(t); if (t.status !== 'done' && m.length > 1 && !m.includes('all')) setAsk(t); else move(t, t.status === 'done' ? 'todo' : 'done'); };
+  const finish = t => { const m = memsOf(t); if (t.status !== 'done' && m.length > 1 && !m.includes('all')) { setDoers([]); setAsk(t); } else move(t, t.status === 'done' ? 'todo' : 'done'); };
   const oneOffDone = db.tasks.filter(t => t.status === 'done' && taskRepeat(t) === 'none');
   const newTask = () => setModal({ title:'', assignees:[(kids[0] || db.members[0]).id], status:'todo', reward:0, repeat:'none' });
   const Row = ({ t }) => { const rp = taskRepeat(t); const isDone = t.status === 'done';
@@ -2243,8 +2262,11 @@ function Pligter() {
     {ask && <Modal title="Hvem har lavet opgaven?" onClose={() => setAsk(null)}>
       <div className="px-5 py-4 flex flex-col gap-3 text-sm">
         <p className="font-semibold">{ask.title}</p>
-        <p className="text-muted">Kun den, der har lavet opgaven, får lommepengene{ask.reward > 0 ? ` (${money(ask.reward)})` : ''}.</p>
-        <div className="flex flex-wrap gap-2">{memsOf(ask).map(id => <button key={id} className="btn" onClick={() => { move(ask, 'done', id); setAsk(null); }}><Dot color={memberFor(db, id).color} size={10} />{memberFor(db, id).name}</button>)}</div>
+        <p className="text-muted">Vælg alle, der har lavet opgaven.{ask.reward > 0 ? ` Lommepengene (${money(ask.reward)}) deles ligeligt mellem dem.` : ''}</p>
+        <div className="flex flex-wrap gap-2">{memsOf(ask).map(id => { const on = doers.includes(id); return <button key={id} type="button" className="chip" aria-pressed={on} onClick={() => setDoers(l => on ? l.filter(x => x !== id) : [...l, id])}><Dot color={memberFor(db, id).color} size={10} />{memberFor(db, id).name}</button>; })}</div>
+        {doers.length > 1 && ask.reward > 0 && <p className="text-xs text-muted">Hver får {money(Math.round(ask.reward / doers.length * 100) / 100)}.</p>}
+        <div className="flex gap-2 justify-end"><button className="btn" onClick={() => setAsk(null)}>Annullér</button>
+          <button className="btn btn-primary" disabled={!doers.length} onClick={() => { move(ask, 'done', doers); setAsk(null); }}>Færdig</button></div>
       </div></Modal>}
     {modal && <TaskModal init={modal} onClose={() => setModal(null)} />}
     {pay && <PayModal {...pay} onClose={() => setPay(null)} />}
