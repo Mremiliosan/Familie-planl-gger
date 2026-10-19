@@ -950,11 +950,11 @@ function PackBlock({ onOpen }) {
   const { db } = useApp();
   const now = new Date(); if (!isPackDay(now)) return null;
   const k = iso(now); const who = packWho(db, k); const swapped = toList(((db.packDuty || {}).swaps || {})[k]).length > 0;
-  return <div className="rounded-2xl px-3.5 py-3 flex items-center gap-3" style={{ background:'var(--t-mint)' }}>
-    <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-surface shrink-0"><Icon name="utensils" size={17} className="text-goodink" /></span>
+  return <div className="rounded-xl px-2.5 py-2 flex items-center gap-2" style={{ background:'var(--t-mint)' }}>
+    <Icon name="utensils" size={15} className="text-goodink shrink-0" />
     <div className="min-w-0 flex-1">
-      <p className="text-xs font-bold uppercase tracking-wider text-muted">Madpakker i dag</p>
-      <p className="font-semibold flex items-center gap-2 flex-wrap">{who.length ? <Who ids={who} /> : <span className="text-muted font-medium">Ikke fordelt</span>}{swapped && <span className="text-xs text-muted font-medium">byttet</span>}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted leading-none mb-0.5">Madpakker i dag</p>
+      <p className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">{who.length ? <Who ids={who} /> : <span className="text-muted font-medium">Ikke fordelt</span>}{swapped && <span className="text-xs text-muted font-medium">byttet</span>}</p>
     </div>
     <button className="btn btn-sm shrink-0" onClick={onOpen}>{who.length ? 'Byt' : 'Vælg'}</button>
   </div>;
@@ -979,48 +979,47 @@ function FamGoalCard() {
   const { db, set, notify } = useApp();
   const g = db.familyGoal;
   const [edit, setEdit] = useState(null); const [amt, setAmt] = useState(''); const [lbl, setLbl] = useState('');
-  const [all, setAll] = useState(false); const [party, setParty] = useState(false);
+  const [add, setAdd] = useState(false); const [party, setParty] = useState(false);
   const QUICK = ['Salg af tøj', 'Pant', 'Lommepenge', 'Gave'];
-  const head = <div className="flex items-center justify-between gap-2">
-    <h2 className="font-display text-lg font-semibold flex items-center gap-2.5 min-w-0"><TintIcon name="star" tint="sun" box={34} size={17} /><span className="truncate">Familiemål</span></h2>
-    {g && <button className="iconbtn" aria-label="Redigér familiemål" onClick={() => setEdit(g)}><Icon name="pencil" size={15} /></button>}</div>;
-  if (!g) return <section className="card p-4 sm:p-5 flex flex-col gap-3 min-w-0">{head}
-    <p className="text-sm text-muted">Spar sammen til en fælles oplevelse – fx biografen eller en tur i svømmehallen.</p>
-    <button className="btn btn-primary self-start" onClick={() => setEdit({})}><Icon name="plus" size={16} />Sæt et familiemål</button>
+  const title = <h2 className="font-display text-base font-semibold flex items-center gap-2 min-w-0"><TintIcon name="star" tint="sun" box={28} size={15} /><span className="truncate">Familiemål</span></h2>;
+  if (!g) return <section className="card p-3 sm:p-4 flex flex-col gap-2 min-w-0">{title}
+    <p className="text-sm text-muted">Spar sammen til en fælles oplevelse, fx biografen.</p>
+    <button className="btn btn-primary btn-sm self-start" onClick={() => setEdit({})}><Icon name="plus" size={15} />Sæt et familiemål</button>
     {edit && <FamGoalModal init={edit} onClose={() => setEdit(null)} />}</section>;
   const saved = g.entries.reduce((s, e) => s + e.amount, 0);
   const pct = Math.min(100, Math.round(saved / g.target * 100)); const reached = saved >= g.target;
-  const add = e => {
+  const submit = e => {
     e.preventDefault(); const v = Number(amt); if (!(v > 0)) return;
     const was = saved >= g.target;
     set('familyGoal', x => ({ ...x, entries:[{ id:uid(), amount:v, label:lbl.trim(), date:iso(new Date()) }, ...x.entries] }));
-    setAmt(''); setLbl(''); if (!was && saved + v >= g.target) setParty(true);
+    setAmt(''); setLbl(''); if (!was && saved + v >= g.target) { setAdd(false); setParty(true); }
   };
   const del = en => { set('familyGoal', x => ({ ...x, entries:x.entries.filter(y => y.id !== en.id) }));
     notify('Beløb fjernet', { label:'Fortryd', fn:() => set('familyGoal', x => ({ ...x, entries:[en, ...x.entries].sort((a, b) => b.date.localeCompare(a.date)) })) }); };
-  const reset = () => { if (!confirm('Fjerne målet og nulstille opsparingen?')) return; const old = g; set('familyGoal', null);
+  const reset = () => { if (!confirm('Fjerne målet og nulstille opsparingen?')) return; const old = g; set('familyGoal', null); setAdd(false);
     notify('Familiemål fjernet', { label:'Fortryd', fn:() => set('familyGoal', old) }); };
-  const shown = all ? g.entries : g.entries.slice(0, 3);
-  return <section className="card p-4 sm:p-5 flex flex-col gap-3 min-w-0">{head}
-    <p className="font-display text-xl font-semibold leading-snug">{g.name}</p>
-    <div><div className="flex items-baseline justify-between text-sm"><span className="tnum"><b className="font-display text-xl">{num(saved)}</b> / {num(g.target)} kr.</span><span className="tnum text-muted">{pct}%</span></div>
-      <div className="h-3 rounded-full bg-surface2 mt-1.5 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"><div className="h-full rounded-full" style={{ width:pct + '%', background:reached ? 'var(--good)' : 'var(--accent)' }} /></div>
-      <p className="text-sm mt-1.5 text-muted">{reached ? <span className="text-goodink font-semibold">🎉 Målet er nået – tid til oplevelsen!{saved > g.target ? ` (${num(saved - g.target)} kr. over)` : ''}</span> : `Mangler ${num(g.target - saved)} kr.`}</p></div>
-    <form onSubmit={add} className="flex flex-col gap-2">
-      <div className="flex gap-2"><input type="number" min="1" step="any" className="field" style={{ maxWidth:90 }} placeholder="Beløb" aria-label="Beløb i kr." value={amt} onChange={e => setAmt(e.target.value)} />
-        <input className="field min-w-0" placeholder="Hvorfra?" aria-label="Hvorfra" value={lbl} onChange={e => setLbl(e.target.value)} />
-        <button className="btn btn-primary shrink-0 whitespace-nowrap" type="submit">Læg i</button></div>
-      <div className="flex flex-wrap gap-1.5">{QUICK.map(q => <button type="button" key={q} className="chip" aria-pressed={lbl === q} onClick={() => setLbl(lbl === q ? '' : q)}>{q}</button>)}</div>
-    </form>
-    {g.entries.length > 0 && <div className="flex flex-col gap-1">
-      {shown.map(en => <div key={en.id} className="flex items-center gap-2 text-sm px-1">
+  return <section className="card p-3 sm:p-4 flex flex-col gap-2 min-w-0">
+    <div className="flex items-center justify-between gap-2">{title}
+      <span className="flex items-center gap-1 shrink-0"><button className="btn btn-sm btn-primary" onClick={() => setAdd(true)}><Icon name="plus" size={14} />Læg i</button>
+        <button className="iconbtn" style={{ width:30, height:30 }} aria-label="Redigér familiemål" onClick={() => setEdit(g)}><Icon name="pencil" size={14} /></button></span></div>
+    <div className="flex items-baseline justify-between gap-2 text-sm"><span className="font-semibold truncate">{g.name}</span><span className="tnum text-muted shrink-0"><b className="text-ink">{num(saved)}</b> / {num(g.target)} kr. · {pct}%</span></div>
+    <div className="h-2.5 rounded-full bg-surface2 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"><div className="h-full rounded-full" style={{ width:pct + '%', background:reached ? 'var(--good)' : 'var(--accent)' }} /></div>
+    <p className="text-xs text-muted">{reached ? <span className="text-goodink font-semibold">🎉 Målet er nået – tid til oplevelsen!</span> : `Mangler ${num(g.target - saved)} kr.`}</p>
+    {edit && <FamGoalModal init={edit} onClose={() => setEdit(null)} />}
+    {add && <Modal title={`Læg i: ${g.name}`} onClose={() => setAdd(false)}><div className="px-5 py-4 flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-2">
+        <div className="flex gap-2"><input type="number" min="1" step="any" className="field" style={{ maxWidth:110 }} autoFocus placeholder="Beløb" aria-label="Beløb i kr." value={amt} onChange={e => setAmt(e.target.value)} />
+          <input className="field min-w-0" placeholder="Hvorfra?" aria-label="Hvorfra" value={lbl} onChange={e => setLbl(e.target.value)} />
+          <button className="btn btn-primary shrink-0 whitespace-nowrap" type="submit">Læg i</button></div>
+        <div className="flex flex-wrap gap-1.5">{QUICK.map(q => <button type="button" key={q} className="chip" aria-pressed={lbl === q} onClick={() => setLbl(lbl === q ? '' : q)}>{q}</button>)}</div>
+      </form>
+      <p className="text-sm tnum"><b>{num(saved)}</b> / {num(g.target)} kr. ({pct}%)</p>
+      {g.entries.length > 0 && <div className="flex flex-col gap-1">{g.entries.map(en => <div key={en.id} className="flex items-center gap-2 text-sm px-1">
         <span className="tnum font-semibold text-goodink w-16 shrink-0">+{num(en.amount)}</span>
         <span className="truncate flex-1 text-muted">{en.label || 'Indbetaling'} · {parse(en.date).getDate()}/{parse(en.date).getMonth() + 1}</span>
-        <button className="iconbtn" style={{ width:28, height:28 }} aria-label="Fjern beløb" onClick={() => del(en)}><Icon name="trash" size={14} /></button></div>)}
-      {g.entries.length > 3 && <button className="btn btn-ghost btn-sm self-start" onClick={() => setAll(a => !a)}>{all ? 'Vis færre' : `Vis alle (${g.entries.length})`}</button>}
-    </div>}
-    {reached && <button className="btn btn-sm self-start" onClick={reset}>Afslut og sæt nyt mål</button>}
-    {edit && <FamGoalModal init={edit} onClose={() => setEdit(null)} />}
+        <button className="iconbtn" style={{ width:28, height:28 }} aria-label="Fjern beløb" onClick={() => del(en)}><Icon name="trash" size={14} /></button></div>)}</div>}
+      {reached && <button className="btn btn-sm self-start" onClick={reset}>Afslut og sæt nyt mål</button>}
+    </div></Modal>}
     {party && <Modal title="Familiemål nået" onClose={() => setParty(false)}><div className="px-5 py-6 text-center flex flex-col gap-3">
       <p className="text-5xl">🎉🥳</p><p className="font-display text-2xl font-semibold">I nåede jeres mål!</p>
       <p className="text-muted">{g.name} – nu har I sparet nok. Tid til at nyde det sammen!</p>
@@ -1074,24 +1073,25 @@ function StreakBar() {
   useEffect(() => {
     if (mine && mine.today && mine.n > 0 && mine.n % days === 0 && cel[me] !== `${todayK}:${mine.n}`) { setParty(mine.n); set('streak', x => ({ ...x, celebrated:{ ...(typeof x.celebrated === 'object' && x.celebrated ? x.celebrated : {}), [me]:`${todayK}:${mine.n}` } })); }
   }, [mine && mine.n, mine && mine.today, days]);
-  if (!meM) return <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="text-sm text-muted">Hvem er du?</span>
+  if (!meM) return <div className="flex flex-wrap items-center gap-1.5"><span className="text-sm text-muted">Hvem er du?</span>
     {db.members.map(m => <button key={m.id} className="chip" onClick={() => setMe(m.id)}><Dot color={m.color} size={9} />{m.name}</button>)}</div>;
   const rows = who.map(id => ({ m: memberFor(db, id), ...personStreak(db, id, todayK) }));
   const missing = rows.filter(r => !r.today);
   const toGo = mine ? days - (mine.n % days) : 0;
-  return <div className="mt-2 flex flex-col gap-1.5">
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-      {mine && <span className="inline-flex items-center gap-1 text-sm font-semibold rounded-full px-2.5 py-1" style={{ background:'var(--t-sun)' }} title="Dage i træk, du har åbnet appen">
-        <span aria-hidden="true">🔥</span><span className="tnum">{mine.n}</span><span className="text-muted font-medium">{mine.n === 1 ? 'dag' : 'dage'} i træk</span></span>}
-      <span className="text-xs text-muted">{mine ? (s.reward ? `Hej ${meM.name}! Belønning om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}: ${s.reward}` : `Hej ${meM.name}! Næste mål om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}`) : `Hej ${meM.name}!`}</span>
-      <button className="text-xs text-accent underline" onClick={() => setMe('')}>Skift profil</button>
-      {!meM.child && <button className="iconbtn" style={{ width:26, height:26 }} aria-label="Indstil streak og belønning" onClick={() => setCfg(true)}><Icon name="pencil" size={13} /></button>}
+  const sm = { padding:'.18rem .55rem', fontSize:'.74rem' };
+  return <div className="flex flex-col gap-1.5">
+    <div className="flex items-center gap-2 min-w-0">
+      {mine && <span className="inline-flex items-center gap-1 text-sm font-semibold rounded-full px-2.5 py-0.5 shrink-0" style={{ background:'var(--t-sun)' }} title="Dage i træk, du har åbnet appen">
+        <span aria-hidden="true">🔥</span><span className="tnum">{mine.n}</span><span className="text-muted font-medium text-xs">{mine.n === 1 ? 'dag' : 'dage'}</span></span>}
+      <span className="text-xs text-muted truncate min-w-0 flex-1">{mine ? (s.reward ? `Hej ${meM.name}! Belønning om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}: ${s.reward}` : `Hej ${meM.name}! Næste mål om ${toGo} ${toGo === 1 ? 'dag' : 'dage'}`) : `Hej ${meM.name}!`}</span>
+      <button className="text-xs text-accent underline shrink-0" onClick={() => setMe('')}>Skift</button>
+      {!meM.child && <button className="iconbtn shrink-0" style={{ width:26, height:26 }} aria-label="Indstil streak og belønning" onClick={() => setCfg(true)}><Icon name="pencil" size={13} /></button>}
     </div>
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Streak-oversigt">
-      {rows.map(r => <span key={r.m.id} className="chip" style={{ cursor:'default', opacity:r.today ? 1 : .6, outline:r.m.id === me ? '2px solid var(--accent)' : 'none' }} title={r.today ? 'Har været inde i dag' : 'Har ikke været inde i dag endnu'}>
-        {r.today ? <Icon name="check" size={13} /> : <Dot color={r.m.color} size={9} />}{r.m.name}<span aria-hidden="true">🔥</span><span className="tnum">{r.n}</span></span>)}
+    <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5" aria-label="Streak-oversigt" style={{ scrollbarWidth:'none' }}>
+      {rows.map(r => <span key={r.m.id} className="chip shrink-0" style={{ ...sm, cursor:'default', opacity:r.today ? 1 : .6, outline:r.m.id === me ? '2px solid var(--accent)' : 'none' }} title={r.today ? 'Har været inde i dag' : 'Har ikke været inde i dag endnu'}>
+        {r.today ? <Icon name="check" size={12} /> : <Dot color={r.m.color} size={8} />}{r.m.name}<span aria-hidden="true">🔥</span><span className="tnum">{r.n}</span></span>)}
+      {!meM.child && missing.length > 0 && <span className="text-xs text-muted shrink-0 pl-1">Mangler: {missing.map(r => r.m.name).join(', ')}</span>}
     </div>
-    {!meM.child && missing.length > 0 && <p className="text-xs text-muted">Mangler i dag: {missing.map(r => r.m.name).join(', ')}</p>}
     {cfg && <StreakModal onClose={() => setCfg(false)} />}
     {party && <Modal title="Streak-belønning" onClose={() => setParty(null)}><div className="px-5 py-6 text-center flex flex-col gap-3">
       <p className="text-5xl">🔥🎉</p><p className="font-display text-2xl font-semibold">{party} dage i træk, {meM.name}!</p>
@@ -1103,7 +1103,7 @@ function StreakBar() {
 /* ---------- Overblik ---------- */
 function Overblik() {
   const { db, go, eventsFor, openSettings } = useApp();
-  const [pack, setPack] = useState(false);
+  const [pack, setPack] = useState(false); const [msgs, setMsgs] = useState(false);
   const now = new Date(); const t0 = startOfDay(now); const today = iso(now); const di = dayIdx(now);
   const evs = eventsFor(today).sort(byTime);
   const trains = db.sessions.filter(s => sessionOn(s, today)).sort((a, b) => a.start.localeCompare(b.start));
@@ -1119,62 +1119,69 @@ function Overblik() {
   const counts = db.members.map(m => ({ m, n:db.done.filter(x => x.date >= wk && x.who.includes(m.id)).length })).sort((a, b) => b.n - a.n);
   const leader = counts[0] && counts[0].n > 0 ? counts[0] : null;
 
-  const Card = ({ title, icon, tint, tab, children }) => <section className="card p-4 sm:p-5 flex flex-col gap-3 min-w-0">
+  const Card = ({ title, icon, tint, tab, children, span = 'full' }) => <section className={`card p-3 sm:p-4 flex flex-col gap-2 min-w-0 ${span === 'full' ? 'col-span-2 md:col-span-1' : 'col-span-1'}`}>
     <div className="flex items-center justify-between gap-2">
-      <h2 className="font-display text-lg font-semibold flex items-center gap-2.5 min-w-0"><TintIcon name={icon} tint={tint} box={34} size={17} /><span className="truncate">{title}</span></h2>
-      <button className="btn btn-ghost btn-sm shrink-0" onClick={() => go(tab)}>Åbn<Icon name="right" size={14} /></button></div>{children}</section>;
-  const Sub = ({ children }) => <p className="lbl mb-0 mt-1">{children}</p>;
+      <h2 className="font-display text-base font-semibold flex items-center gap-2 min-w-0"><TintIcon name={icon} tint={tint} box={28} size={15} /><span className="truncate">{title}</span></h2>
+      <button className="btn btn-ghost btn-sm shrink-0" style={{ padding:'.2rem .45rem' }} aria-label={`Åbn ${title}`} onClick={() => go(tab)}><Icon name="right" size={14} /></button></div>{children}</section>;
+  const Sub = ({ children }) => <p className="lbl mb-0 mt-0.5" style={{ fontSize:10 }}>{children}</p>;
   const nodes = {
     beskeder: <Card key="b" title="Beskeder" icon="pin" tint="rose" tab="koeleskab">
-      {rulesToday.map(r => <p key={r.id} className="text-sm flex items-center gap-2 rounded-xl px-3 py-2" style={{ background:'var(--t-sun)' }}><Icon name="bell" size={14} className="text-warn" />{r.text}</p>)}
-      {shownNotes.map(n => <p key={n.id} className="text-sm font-medium rounded-xl px-3 py-2.5 flex items-start gap-2" style={{ background:`var(--${n.color})` }}>{n.pinned && <Icon name="pin" size={13} className="mt-1 text-accent" />}<span className="flex-1 min-w-0">{n.text}</span></p>)}
+      <div className="flex flex-wrap gap-1.5 cursor-pointer" role="button" tabIndex={0} aria-label="Vis beskeder" onClick={() => setMsgs(true)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMsgs(true); } }}>
+      {rulesToday.map(r => <p key={r.id} className="text-[13px] flex items-center gap-1.5 rounded-lg px-2 py-1" style={{ background:'var(--t-sun)' }}><Icon name="bell" size={12} className="text-warn shrink-0" />{r.text}</p>)}
+      {shownNotes.map(n => <p key={n.id} className="text-[13px] font-medium rounded-lg px-2 py-1 flex items-start gap-1.5" style={{ background:`var(--${n.color})` }}>{n.pinned && <Icon name="pin" size={11} className="mt-0.5 text-accent shrink-0" />}<span className="min-w-0">{n.text}</span></p>)}
+      </div>
       {!shownNotes.length && !rulesToday.length && <p className="text-sm text-muted">Ingen beskeder lige nu.</p>}
     </Card>,
     kalender: <Card key="k" title="Kalender" icon="calendar" tint="lilac" tab="kalender">
-      <Sub>I dag</Sub>
       {!evs.length && !trains.length && <p className="text-sm text-muted">Ingen aftaler i dag.</p>}
-      {evs.map(e => <div key={e.id + e.date} className="flex items-center gap-2.5 text-sm rounded-xl px-3 py-2" style={{ background:evBg(db, e.members) }}>
-        <span className="w-[52px] tnum text-muted shrink-0 text-xs">{e.start || 'Hele dagen'}</span><span className="truncate flex-1 font-semibold">{e.title}</span><PersonDots ids={e.members} /></div>)}
-      {trains.map(s => <div key={s.id} className="flex items-center gap-2.5 text-sm text-muted px-3 py-1.5">
-        <span className="w-[52px] tnum shrink-0 text-xs">{s.start}</span><Icon name="dumbbell" size={14} /><span className="truncate flex-1">{s.activity}</span><PersonDots ids={[s.member]} /></div>)}
+      {evs.map(e => <div key={e.id + e.date} className="flex items-center gap-2 text-sm rounded-lg px-2.5 py-1.5" style={{ background:evBg(db, e.members) }}>
+        <span className="w-[46px] tnum text-muted shrink-0 text-xs">{e.start || 'Hele dagen'}</span><span className="truncate flex-1 font-semibold">{e.title}</span><PersonDots ids={e.members} /></div>)}
+      {trains.map(s => <div key={s.id} className="flex items-center gap-2 text-sm text-muted px-2.5">
+        <span className="w-[46px] tnum shrink-0 text-xs">{s.start}</span><Icon name="dumbbell" size={13} /><span className="truncate flex-1">{s.activity}</span><PersonDots ids={[s.member]} /></div>)}
       {upcoming.length > 0 && <><Sub>Kommende dage</Sub>
-        {upcoming.map(e => <div key={e.id + e.dk} className="flex items-center gap-2.5 text-sm px-1">
-          <span className="w-[52px] tnum text-muted shrink-0 text-xs">{DS[dayIdx(parse(e.dk))]} {parse(e.dk).getDate()}.</span><span className="truncate flex-1">{e.title}</span><PersonDots ids={e.members} size={10} /></div>)}</>}
+        {upcoming.map(e => <div key={e.id + e.dk} className="flex items-center gap-2 text-[13px] px-1 leading-tight">
+          <span className="w-[46px] tnum text-muted shrink-0 text-xs">{DS[dayIdx(parse(e.dk))]} {parse(e.dk).getDate()}.</span><span className="truncate flex-1">{e.title}</span><PersonDots ids={e.members} size={9} /></div>)}</>}
     </Card>,
     mad: <Card key="m" title="Aftensmad" icon="utensils" tint="sun" tab="madplan">
-      {meal && meal.dish ? <>
-        <p className="font-display text-xl font-semibold leading-snug">{meal.dish}</p>
-        <p className="text-sm text-muted flex items-center gap-2">Kokketjans {meal.cook ? <Who id={meal.cook} small /> : <span>ikke fordelt</span>}</p>
-      </> : <p className="text-sm text-muted">Ingen ret planlagt i dag.</p>}
+      {meal && meal.dish ? <p className="flex items-center gap-2 flex-wrap"><span className="font-display text-lg font-semibold leading-snug">{meal.dish}</span>
+        <span className="text-xs text-muted flex items-center gap-1.5">Kok {meal.cook ? <Who id={meal.cook} small /> : <span>ikke fordelt</span>}</span></p>
+        : <p className="text-sm text-muted">Ingen ret planlagt i dag.</p>}
       <PackBlock onOpen={() => setPack(true)} />
     </Card>,
-    opgaver: <Card key="o" title="Opgaver" icon="listchecks" tint="mint" tab="pligter">
-      <p className="text-sm"><span className="font-display text-2xl font-semibold tnum">{openTasks.length}</span> <span className="text-muted">åbne opgaver</span></p>
-      {openTasks.slice(0, 4).map(t => <div key={t.id} className="flex items-center gap-2.5 text-sm px-1"><PersonDots ids={memsOf(t)} size={10} /><span className="truncate flex-1">{t.title}</span>{t.reward > 0 && <span className="text-xs text-goodink tnum">+{num(t.reward)}</span>}</div>)}
-      {leader && <p className="text-sm rounded-xl px-3 py-2 flex items-center gap-2" style={{ background:'var(--t-sun)' }}><Icon name="trophy" size={16} className="text-warn" /><span>Ugens flittigste hjælper: <b className="font-semibold">{leader.m.name}</b> <span className="text-muted tnum">({leader.n})</span></span></p>}
+    opgaver: <Card key="o" span="half" title="Opgaver" icon="listchecks" tint="mint" tab="pligter">
+      <p className="text-sm leading-none"><span className="font-display text-xl font-semibold tnum">{openTasks.length}</span> <span className="text-muted text-xs">åbne</span></p>
+      {openTasks.slice(0, 3).map(t => <div key={t.id} className="flex items-center gap-1.5 text-[13px]"><PersonDots ids={memsOf(t)} size={8} /><span className="truncate flex-1">{t.title}</span>{t.reward > 0 && <span className="text-[11px] text-goodink tnum">+{num(t.reward)}</span>}</div>)}
+      {openTasks.length > 3 && <p className="text-xs text-muted">og {openTasks.length - 3} mere</p>}
+      {leader && <p className="text-xs rounded-lg px-2 py-1 flex items-center gap-1.5" style={{ background:'var(--t-sun)' }}><Icon name="trophy" size={13} className="text-warn shrink-0" /><span className="truncate"><b className="font-semibold">{leader.m.name}</b> ({leader.n}) ugens hjælper</span></p>}
     </Card>,
-    familiemaal: <FamGoalCard key="fm" />,
-    indkoeb: <Card key="i" title="Indkøbsliste" icon="cart" tint="aqua" tab="indkoeb">
-      <p className="text-sm"><span className="font-display text-2xl font-semibold tnum">{left.length}</span> <span className="text-muted">varer tilbage</span></p>
-      {left.length > 0 && <p className="text-sm text-muted">{left.slice(0, 6).map(i => i.name).join(', ')}{left.length > 6 ? ` og ${left.length - 6} mere` : ''}</p>}
+    indkoeb: <Card key="i" span="half" title="Indkøb" icon="cart" tint="aqua" tab="indkoeb">
+      <p className="text-sm leading-none"><span className="font-display text-xl font-semibold tnum">{left.length}</span> <span className="text-muted text-xs">varer tilbage</span></p>
+      {left.length > 0 && <p className="text-[13px] text-muted" style={{ display:'-webkit-box', WebkitLineClamp:4, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{left.slice(0, 8).map(i => i.name).join(', ')}{left.length > 8 ? ` og ${left.length - 8} mere` : ''}</p>}
     </Card>,
+    familiemaal: <div key="fm" className="col-span-2 md:col-span-1 min-w-0"><FamGoalCard /></div>,
     foedsel: <Card key="f" title="Fødselsdage" icon="cake" tint="lilac" tab="foedselsdage">
-      {bds.length ? bds.map(x => <div key={x.b.id} className="flex items-center gap-2.5 text-sm px-1"><Icon name={x.b.kind === 'mærkedag' ? 'gift' : 'cake'} size={15} className="text-accent" />
-        <span className="truncate flex-1 font-medium">{x.b.name}</span><span className="text-muted tnum shrink-0">{x.days === 0 ? 'I dag!' : `om ${x.days} ${x.days === 1 ? 'dag' : 'dage'}`}</span></div>)
+      {bds.length ? <div className="flex flex-wrap gap-1.5">{bds.map(x => <span key={x.b.id} className="inline-flex items-center gap-1.5 text-[13px] rounded-lg px-2 py-1" style={{ background:'var(--t-lilac)' }}><Icon name={x.b.kind === 'mærkedag' ? 'gift' : 'cake'} size={12} className="text-accent shrink-0" />
+        <span className="font-medium">{x.b.name}</span><span className="text-muted tnum text-xs">{x.days === 0 ? 'I dag!' : `${x.days} ${x.days === 1 ? 'dag' : 'dage'}`}</span></span>)}</div>
         : <p className="text-sm text-muted">Ingen datoer endnu.</p>}
     </Card>
   };
   const order = pinned.length ? ['beskeder', 'kalender', 'mad', 'opgaver', 'indkoeb', 'familiemaal', 'foedsel'] : ['kalender', 'mad', 'opgaver', 'indkoeb', 'familiemaal', 'beskeder', 'foedsel'];
   return <div>
-    <div className="flex items-center gap-4 mb-6">
-      <img src={LOGO} alt="Familie J" width="64" height="64" className="rounded-[20px] shrink-0 shadow-lg" style={{ boxShadow:'var(--shadow)' }} />
+    <div className="flex items-center gap-3 mb-3">
+      <img src={LOGO} alt="Familie J" width="48" height="48" className="rounded-2xl shrink-0" style={{ boxShadow:'var(--shadow)' }} />
       <div className="min-w-0">
-        <p className="text-sm text-muted tnum">{fmtLong(now)} · uge {isoWeek(now)}</p>
-        <h1 className="font-display text-3xl font-semibold leading-tight">{greeting(now)}, Familie J</h1>
-        <StreakBar />
+        <p className="text-xs text-muted tnum">{fmtLong(now)} · uge {isoWeek(now)}</p>
+        <h1 className="font-display text-xl sm:text-3xl font-semibold leading-tight">{greeting(now)}, Familie J</h1>
       </div>
     </div>
-    <div className="grid gap-4 md:grid-cols-2 items-start">{order.map(k => nodes[k])}</div>
+    <div className="mb-3"><StreakBar /></div>
+    <div className="grid grid-cols-2 lg:grid-cols-3 md:grid-cols-2 gap-3 items-start">{order.map(k => nodes[k])}</div>
+    {msgs && <Modal title="Beskeder" onClose={() => setMsgs(false)}><div className="px-5 py-4 flex flex-col gap-2">
+      {rulesToday.map(r => <p key={r.id} className="text-base flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background:'var(--t-sun)' }}><Icon name="bell" size={16} className="text-warn mt-1 shrink-0" />{r.text}</p>)}
+      {shownNotes.map(n => <p key={n.id} className="text-base font-medium rounded-xl px-3 py-2.5 flex items-start gap-2" style={{ background:`var(--${n.color})` }}>{n.pinned && <Icon name="pin" size={15} className="mt-1 text-accent shrink-0" />}<span className="min-w-0 whitespace-pre-wrap">{n.text}</span></p>)}
+      {!shownNotes.length && !rulesToday.length && <p className="text-muted">Ingen beskeder lige nu.</p>}
+      <button className="btn self-end mt-1" onClick={() => { setMsgs(false); go('koeleskab'); }}>Åbn Beskeder<Icon name="right" size={14} /></button>
+    </div></Modal>}
     {pack && <PackModal onClose={() => setPack(false)} />}
   </div>;
 }
