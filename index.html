@@ -2192,14 +2192,15 @@ function TaskModal({ init, onClose }) {
   const { db, set } = useApp();
   const [f, setF] = useState({ ...init, assignees:memsOf(init), repeat:taskRepeat(init), pay:(init.reward || 0) > 0, reward:init.reward > 0 ? String(init.reward) : '' });
   const u = (k, v) => setF(p => ({ ...p, [k]:v }));
-  const [editQ, setEditQ] = useState(false); const [newQ, setNewQ] = useState({ kids:'', adults:'' });
+  const [showQ, setShowQ] = useState(false); const [warn, setWarn] = useState(false); const [editQ, setEditQ] = useState(false); const [newQ, setNewQ] = useState({ kids:'', adults:'' });
   const quick = { kids:(db.choreQuick && db.choreQuick.kids) || CHORES_KIDS, adults:(db.choreQuick && db.choreQuick.adults) || CHORES_ADULTS };
   const saveQuick = (key, list) => set('choreQuick', { ...quick, [key]:list });
   const addQuick = key => { const v = newQ[key].trim(); if (!v) return; if (!quick[key].some(x => x.toLowerCase() === v.toLowerCase())) saveQuick(key, [...quick[key], v]); setNewQ(p => ({ ...p, [key]:'' })); };
   const unit = db.rewardUnit === 'kr' ? 'kroner' : 'point';
   const submit = e => {
     e.preventDefault(); if (!f.title.trim()) return;
-    const { pay, ...rest } = f; const who = f.assignees.length ? f.assignees : ['all'];
+    if (!f.assignees.length) { setWarn(true); return; }
+    const { pay, ...rest } = f; const who = f.assignees;
     const t = { ...rest, title:f.title.trim(), assignees:who, assignee:who[0], reward:pay ? Math.max(0, Number(f.reward) || 0) : 0, repeat:f.repeat, recurring:f.repeat !== 'none' };
     if (t.id) set('tasks', l => l.map(x => x.id === t.id ? t : x)); else set('tasks', l => [...l, { ...t, id:uid() }]);
     onClose();
@@ -2207,12 +2208,14 @@ function TaskModal({ init, onClose }) {
   const del = () => { set('tasks', l => l.filter(x => x.id !== f.id)); onClose(); };
   return <FormModal title={f.id ? 'Redigér opgave' : 'Ny opgave'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
     <Field label="Opgave"><input className="field" autoFocus value={f.title} onChange={e => u('title', e.target.value)} placeholder="Fx tøm opvasker" /></Field>
-    {!f.id && <div className="flex flex-col gap-3 -mt-1">
+    {!f.id && <div className="-mt-1">
+      <button type="button" className="btn btn-sm" aria-expanded={showQ} onClick={() => setShowQ(v => !v)}><Icon name={showQ ? 'down' : 'right'} size={14} />Hurtige valg</button>
+    {showQ && <div className="flex flex-col gap-3 mt-2 rounded-2xl bg-surface2 p-3">
       {[['kids', 'Hurtigt valg til børn'], ['adults', 'Hurtigt valg til voksne']].map(([key, lbl]) => { const list = quick[key]; return <div key={key}>
         <div className="flex items-center justify-between gap-2 mb-1.5"><span className="lbl mb-0">{lbl}</span>
           {key === 'kids' && <button type="button" className="text-xs font-semibold text-accent" onClick={() => setEditQ(v => !v)}>{editQ ? 'Færdig' : 'Redigér'}</button>}</div>
         <div className="flex flex-wrap gap-1.5">{list.map(t => <span key={t} className="inline-flex items-center">
-          <button type="button" className="chip" aria-pressed={f.title === t} onClick={() => u('title', t)}>{t}</button>
+          <button type="button" className="chip" aria-pressed={f.title === t} onClick={() => { u('title', t); if (!editQ) setShowQ(false); }}>{t}</button>
           {editQ && <button type="button" className="iconbtn" style={{ width:28, height:28 }} aria-label={`Slet hurtigt valg ${t}`} onClick={() => saveQuick(key, list.filter(x => x !== t))}><Icon name="x" size={14} /></button>}</span>)}
           {!list.length && <span className="text-sm text-muted">Ingen. Tilføj nedenfor.</span>}</div>
         {editQ && <div className="flex gap-2 mt-2"><input className="field" value={newQ[key]} placeholder="Nyt hurtigt valg" aria-label={`Nyt hurtigt valg (${key === 'kids' ? 'børn' : 'voksne'})`} onChange={e => setNewQ(p => ({ ...p, [key]:e.target.value }))}
@@ -2221,7 +2224,8 @@ function TaskModal({ init, onClose }) {
       </div>; })}
       {editQ && <button type="button" className="text-xs text-muted underline self-start" onClick={() => { set('choreQuick', null); }}>Gendan standardlisterne</button>}
     </div>}
-    <div><span className="lbl">Hvem?</span><MemberPick multi all value={f.assignees} onChange={v => u('assignees', v)} /><p className="text-xs text-muted mt-1.5">{f.assignees.length > 1 && !f.assignees.includes('all') ? 'Alle de valgte kan se opgaven. Når den er færdig, vælger I, hvem der har lavet den, og kun den person får lommepengene.' : 'Vælg flere ved at trykke på dem. Er der flere, vælger I ved afkrydsning, hvem der har lavet den.'}</p></div>
+    </div>}
+    <div><span className="lbl">Hvem?</span>{warn && <p role="alert" className="text-sm font-semibold rounded-xl px-3 py-2 mb-2 bg-dangersoft text-danger">⚠️ Vælg, hvem der skal udføre opgaven, før du kan oprette den.</p>}<MemberPick multi all value={f.assignees} onChange={v => { u('assignees', v); setWarn(false); }} /><p className="text-xs text-muted mt-1.5">{f.assignees.length > 1 && !f.assignees.includes('all') ? 'Alle de valgte kan se opgaven. Når den er færdig, vælger I, hvem der har lavet den, og kun den person får lommepengene.' : 'Vælg flere ved at trykke på dem. Er der flere, vælger I ved afkrydsning, hvem der har lavet den.'}</p></div>
     {(f.assignees.includes('all') || f.assignees.some(id => { const m = db.members.find(x => x.id === id); return m && !m.child; })) && <div><span className="lbl">Størrelse (point til forældrenes belønninger)</span>
       <div className="flex flex-wrap gap-1.5">{TASK_SIZES.map(([w, n, ex]) => <button type="button" key={w} className="chip" aria-pressed={(f.weight || 1) === w} onClick={() => u('weight', w)} title={ex}>{n} · {w} p.</button>)}</div>
       <p className="text-xs text-muted mt-1.5">{TASK_SIZES.find(s => s[0] === (f.weight || 1))[2]}. Større opgaver giver flere point mod jeres fælles ønsker.</p></div>}
@@ -2334,20 +2338,26 @@ function ParentWishes() {
   const { db, set, notify } = useApp(); const [edit, setEdit] = useState(null); const [showHist, setShowHist] = useState(false);
   const wishes = db.parentWishes || []; const active = wishes.filter(w => !w.redeemed); const hist = wishes.filter(w => w.redeemed).sort((a, b) => b.redeemed.localeCompare(a.redeemed));
   const nm = id => id === 'shared' ? 'Begge' : memberFor(db, id).name;
+  const shift = (w, dir) => set('parentWishes', l => { const act = l.filter(x => !x.redeemed); const i = act.findIndex(x => x.id === w.id); const j = i + dir; if (i < 0 || j < 0 || j >= act.length) return l;
+    const a = l.findIndex(x => x.id === act[i].id), b = l.findIndex(x => x.id === act[j].id); const n = [...l]; [n[a], n[b]] = [n[b], n[a]]; return n; });
   const deliver = w => { set('parentWishes', l => l.map(x => x.id === w.id ? { ...x, redeemed:iso(new Date()) } : x)); notify(`${w.title} er markeret som leveret 🎉`, { label:'Fortryd', fn:() => set('parentWishes', l => l.map(x => x.id === w.id ? { ...x, redeemed:'' } : x)) }); };
   return <div>
     <div className="flex items-center justify-between gap-2 mb-2"><p className="lbl mb-0">Forældrenes belønninger <span className="normal-case font-medium text-muted">(kun synlig for voksne)</span></p>
       <button className="btn btn-sm" onClick={() => setEdit({})}><Icon name="plus" size={14} />Nyt ønske</button></div>
     <div className="grid gap-3 sm:grid-cols-2">
-      {active.map(w => { const n = wishProgress(db, w); const pct = Math.min(100, Math.round(n / w.target * 100)); const ok = n >= w.target;
+      {active.map((w, idx) => { const n = wishProgress(db, w); const pct = Math.min(100, Math.round(n / w.target * 100)); const ok = n >= w.target;
         return <div key={w.id} className="rounded-2xl bg-surface2 p-4 flex flex-col gap-2 min-w-0">
           <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold flex items-center gap-1.5"><Icon name="gift" size={15} className="text-accent shrink-0" /><span className="truncate">{w.title}</span></p>
-            <p className="text-xs text-muted">{w.owner === 'shared' ? 'Optjenes af jer begge sammen' : `${nm(w.owner)} optjener`}{w.giver ? ` · ${nm(w.giver)} leverer` : ''}</p></div>
-            <button className="iconbtn" aria-label="Redigér ønske" onClick={() => setEdit(w)}><Icon name="pencil" size={15} /></button></div>
+            <p className="text-xs text-muted">{active.length > 1 ? `Prioritet ${idx + 1} · ` : ''}{w.owner === 'shared' ? 'Optjenes af jer begge sammen' : `${nm(w.owner)} optjener`}{w.giver ? ` · ${nm(w.giver)} leverer` : ''}</p></div>
+            <span className="flex items-center shrink-0">
+              {active.length > 1 && <><button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Prioritér ${w.title} højere`} disabled={idx === 0} onClick={() => shift(w, -1)}><Icon name="down" size={15} className="rotate-180" /></button>
+                <button className="iconbtn" style={{ width:28, height:28 }} aria-label={`Prioritér ${w.title} lavere`} disabled={idx === active.length - 1} onClick={() => shift(w, 1)}><Icon name="down" size={15} /></button></>}
+              <button className="iconbtn" aria-label="Redigér ønske" onClick={() => setEdit(w)}><Icon name="pencil" size={15} /></button></span></div>
           <div className="flex items-baseline justify-between text-sm"><span className="tnum"><b className="font-display text-xl">{n}</b> / {w.target} point</span><span className="tnum text-muted">{pct}%</span></div>
           <div className="h-2.5 rounded-full bg-surface overflow-hidden"><div className="h-full rounded-full" style={{ width:pct + '%', background:ok ? 'var(--good)' : 'var(--accent)' }} /></div>
           {ok && <div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold text-goodink">🎉 Optjent!{w.giver ? ` ${nm(w.giver)} leverer` : ''}</span><button className="btn btn-sm btn-primary" onClick={() => deliver(w)}>Markér som leveret</button></div>}
         </div>; })}
+      {active.length > 1 && <p className="text-xs text-muted sm:col-span-2">Point fra løste opgaver fylder ønsket med prioritet 1 først, derefter nummer 2 osv. Brug pilene til at ændre rækkefølgen.</p>}
       {!active.length && <p className="text-sm text-muted sm:col-span-2">Ingen ønsker endnu. Tryk "Nyt ønske", fx massage, filmaften eller et hotelophold.</p>}
     </div>
     {(() => { const bank = db.pointBank || {}; const adults = db.members.filter(m => !m.child);
@@ -2389,7 +2399,7 @@ function Pligter() {
   });
   const finish = t => { const m = memsOf(t); if (t.status !== 'done' && m.length > 1 && !m.includes('all')) { setDoers([]); setAsk(t); } else move(t, t.status === 'done' ? 'todo' : 'done'); };
   const oneOffDone = db.tasks.filter(t => t.status === 'done' && taskRepeat(t) === 'none');
-  const newTask = () => setModal({ title:'', assignees:[(kids[0] || db.members[0]).id], status:'todo', reward:0, repeat:'none' });
+  const newTask = () => setModal({ title:'', assignees:[], status:'todo', reward:0, repeat:'none' });
   const Row = ({ t }) => { const rp = taskRepeat(t); const isDone = t.status === 'done';
     return <div className="flex items-center gap-3 px-3 py-2.5 border-t border-line first:border-t-0">
       <Check done={isDone} label={`Marker ${t.title}`} onClick={() => finish(t)} />
