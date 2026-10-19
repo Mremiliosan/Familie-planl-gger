@@ -713,7 +713,7 @@ const SWATCHES = ['#5BB6D6', '#EE8FB3', '#6FCBA3', '#F3BE4F', '#A98BE8', '#F59E7
 function emptyDb() {
   return { v:1, demo:false, members:FRESH_MEMBERS, events:[], birthdays:[], shopping:[], pantry:[], choreQuick:null, catMap:{}, quickNotes:[], packDuty:{ plan:{}, swaps:{} }, dealsCheckedAt:null,
     meals:{}, recipes:[], feedMap:{}, feedHidden:{}, feedOverride:{}, extFeeds:[], settings:{ useProxy:false, proxy:'' },
-    sessions:[], goals:[], familyGoal:null, payRequests:[], parentWishes:[], streak:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
+    sessions:[], goals:[], familyGoal:null, payRequests:[], parentWishes:[], pointBank:{}, streak:null, tasks:[], ledger:[], done:[], rewardUnit:'kr', notes:[], lunch:{}, rules:[],
     ui:{ tab:'overblik', calView:'month', calFilter:'all', showTraining:true, theme:'system' } };
 }
 function seedDb() {
@@ -799,7 +799,7 @@ function loadDb() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      if (p && p.v === 1) { const base = emptyDb(); const tasks = (p.tasks || []).map(t => t.status === 'doing' ? { ...t, status:'todo' } : t); return { ...base, ...p, tasks, ui:{ ...base.ui, ...(p.ui || {}) }, settings:{ ...base.settings, ...(p.settings || {}) } }; }
+      if (p && p.v === 1) { const base = emptyDb(); if (Array.isArray(p.parentWishes)) p.parentWishes = p.parentWishes.map(w => w.saved != null ? w : { ...w, saved:Math.min(w.target, legacyWishProgress(p, w)) }); const tasks = (p.tasks || []).map(t => t.status === 'doing' ? { ...t, status:'todo' } : t); return { ...base, ...p, tasks, ui:{ ...base.ui, ...(p.ui || {}) }, settings:{ ...base.settings, ...(p.settings || {}) } }; }
     }
   } catch (e) {}
   return seedDb();
@@ -2265,20 +2265,58 @@ function RequestModal({ member, balance, onClose }) {
 /* ---------- Forældrenes belønninger (kun synlig for voksne) ---------- */
 const TASK_SIZES = [[1, 'Lille', 'fx tøm opvasker'], [3, 'Mellem', 'fx støvsug'], [5, 'Stor', 'fx gør badeværelset rent'], [10, 'Kæmpe', 'fx hele huset']];
 const WISH_QUICK = ['Filmaften', 'Massage', 'Hotelophold', 'Middag ude', 'Sovemorgen', 'Date night', 'Spa-dag'];
-function wishProgress(db, w) {
-  const adults = db.members.filter(m => !m.child).map(m => m.id);
+function legacyWishProgress(db, w) {
+  const adults = (db.members || []).filter(m => !m.child).map(m => m.id);
   const owners = w.owner === 'shared' ? adults : [w.owner];
-  return db.done.filter(x => x.date >= w.created && (x.who || []).some(id => owners.includes(id))).reduce((s, x) => s + (x.pts || 1), 0);
+  return (db.done || []).filter(x => x.date >= w.created && (x.who || []).some(id => owners.includes(id))).reduce((s, x) => s + (x.pts || 1), 0);
+}
+const wishProgress = (db, w) => Math.min(w.target, w.saved || 0);
+const isAdultId = (d, id) => { const m = d.members.find(x => x.id === id); return !!m && !m.child; };
+// Fordel point: først til den voksnes aktive ønsker (ældste først), resten ryger på pointkontoen
+function allocPoints(d, id, pts, wishes, bank) {
+  const alloc = []; let rest = pts;
+  wishes = wishes.map(w => ({ ...w }));
+  wishes.filter(w => !w.redeemed && (w.owner === id || w.owner === 'shared')).forEach(w => {
+    const room = w.target - (w.saved || 0); if (room <= 0 || rest <= 0) return;
+    const take = Math.min(room, rest); w.saved = (w.saved || 0) + take; rest -= take; alloc.push({ w:w.id, id, pts:take });
+  });
+  bank = { ...bank };
+  if (rest > 0) { bank[id] = (bank[id] || 0) + rest; alloc.push({ w:'bank', id, pts:rest }); }
+  return { wishes, bank, alloc };
+}
+function reverseAlloc(alloc, wishes, bank) {
+  wishes = wishes.map(w => ({ ...w })); bank = { ...bank };
+  (alloc || []).forEach(a => {
+    if (a.w === 'bank') bank[a.id] = Math.max(0, (bank[a.id] || 0) - a.pts);
+    else { const w = wishes.find(x => x.id === a.w); if (w && !w.redeemed) w.saved = Math.max(0, (w.saved || 0) - a.pts); }
+  });
+  return { wishes, bank };
 }
 function WishModal({ init, onClose }) {
-  const { db, set } = useApp(); const adults = db.members.filter(m => !m.child);
+  const { db, up } = useApp(); const adults = db.members.filter(m => !m.child);
   const [f, setF] = useState({ owner:adults[0] ? adults[0].id : 'shared', title:'', target:20, giver:'', ...init }); const u = (k, v) => setF(p => ({ ...p, [k]:v }));
   const giverOpts = f.owner === 'shared' ? [] : adults.filter(a => a.id !== f.owner);
+  const adultIds = adults.map(a => a.id); const bankOf = id => (db.pointBank || {})[id] || 0;
+  const avail = f.owner === 'shared' ? adultIds.reduce((s, id) => s + bankOf(id), 0) : bankOf(f.owner);
+  const evenSplit = (bank, total) => { const b = { ...bank }; const n = adultIds.length || 1; adultIds.forEach((id, i) => { b[id] = (b[id] || 0) + Math.floor(total / n) + (i === 0 ? total % n : 0); }); return b; };
   const submit = e => { e.preventDefault(); if (!f.title.trim()) return;
     const w = { ...f, title:f.title.trim(), target:Math.max(1, Math.round(Number(f.target)) || 1), giver:f.owner === 'shared' ? '' : (f.giver || (giverOpts[0] ? giverOpts[0].id : '')) };
-    if (w.id) set('parentWishes', l => (l || []).map(x => x.id === w.id ? w : x)); else set('parentWishes', l => [...(l || []), { ...w, id:uid(), created:iso(new Date()), redeemed:'' }]);
+    up(d => {
+      let bank = { ...(d.pointBank || {}) };
+      if (w.id) {
+        const old = (d.parentWishes || []).find(x => x.id === w.id); let saved = (old && old.saved) || 0;
+        if (saved > w.target) { const extra = saved - w.target; saved = w.target; if (w.owner === 'shared') bank = evenSplit(bank, extra); else bank[w.owner] = (bank[w.owner] || 0) + extra; }
+        return { ...d, pointBank:bank, parentWishes:(d.parentWishes || []).map(x => x.id === w.id ? { ...w, saved } : x) };
+      }
+      // nyt ønske: brug opsparede point fra pointkontoen med det samme
+      let need = w.target, saved = 0; const owners = w.owner === 'shared' ? adultIds : [w.owner];
+      owners.forEach(id => { const t = Math.min(need, bank[id] || 0); if (t > 0) { bank[id] = (bank[id] || 0) - t; need -= t; saved += t; } });
+      return { ...d, pointBank:bank, parentWishes:[...(d.parentWishes || []), { ...w, id:uid(), created:iso(new Date()), redeemed:'', saved }] };
+    });
     onClose(); };
-  const del = () => { set('parentWishes', l => (l || []).filter(x => x.id !== f.id)); onClose(); };
+  const del = () => { up(d => { const old = (d.parentWishes || []).find(x => x.id === f.id); let bank = { ...(d.pointBank || {}) }; const saved = (old && !old.redeemed && old.saved) || 0;
+    if (saved > 0) { if (old.owner === 'shared') bank = evenSplit(bank, saved); else bank[old.owner] = (bank[old.owner] || 0) + saved; }
+    return { ...d, pointBank:bank, parentWishes:(d.parentWishes || []).filter(x => x.id !== f.id) }; }); onClose(); };
   return <FormModal title={f.id ? 'Redigér ønske' : 'Nyt ønske'} onClose={onClose} onSubmit={submit} onDelete={f.id ? del : null}>
     <div><span className="lbl">Hvem optjener det?</span><div className="flex flex-wrap gap-1.5">
       {adults.map(a => <button type="button" key={a.id} className="chip" aria-pressed={f.owner === a.id} onClick={() => { u('owner', a.id); u('giver', ''); }}><Dot color={a.color} size={9} />{a.name}</button>)}
@@ -2288,7 +2326,8 @@ function WishModal({ init, onClose }) {
     <Field label="Hvor mange point skal der til?"><input type="number" min="1" className="field" value={f.target} onChange={e => u('target', e.target.value)} /></Field>
     {giverOpts.length > 0 && <div><span className="lbl">Hvem leverer ønsket?</span><div className="flex flex-wrap gap-1.5">
       {giverOpts.map(a => <button type="button" key={a.id} className="chip" aria-pressed={(f.giver || giverOpts[0].id) === a.id} onClick={() => u('giver', a.id)}><Dot color={a.color} size={9} />{a.name}</button>)}</div></div>}
-    <p className="text-xs text-muted">Opgaver giver point efter størrelse: Lille 1, Mellem 3, Stor 5, Kæmpe 10 (vælges på opgaven). Tip: 20 point svarer til fx 10 små og 2 store opgaver. Alt, den optjenende løser fra i dag, tæller med. Når målet er nået, kan I markere ønsket som leveret.</p>
+    {!f.id && avail > 0 && <p className="text-sm rounded-xl px-3 py-2" style={{ background:'var(--t-sun)' }}>💰 Der ligger {avail} point på pointkontoen. De bruges til dette ønske med det samme.</p>}
+    <p className="text-xs text-muted">Opgaver giver point efter størrelse: Lille 1, Mellem 3, Stor 5, Kæmpe 10 (vælges på opgaven). Tip: 20 point svarer til fx 10 små og 2 store opgaver. Når målet er nået, stopper pointene på ønsket, og nye point går på pointkontoen, til I opretter et nyt ønske.</p>
   </FormModal>;
 }
 function ParentWishes() {
@@ -2311,6 +2350,12 @@ function ParentWishes() {
         </div>; })}
       {!active.length && <p className="text-sm text-muted sm:col-span-2">Ingen ønsker endnu. Tryk "Nyt ønske", fx massage, filmaften eller et hotelophold.</p>}
     </div>
+    {(() => { const bank = db.pointBank || {}; const adults = db.members.filter(m => !m.child);
+      const free = adults.filter(a => !active.some(w => w.owner === a.id || w.owner === 'shared') && (bank[a.id] || 0) > 0);
+      return free.length > 0 ? <div className="mt-3 rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2" style={{ background:'var(--t-sun)' }}>
+        <span className="font-semibold text-sm flex items-center gap-1.5">💰 Pointkonto</span>
+        {free.map(a => <span key={a.id} className="inline-flex items-center gap-1.5 text-sm"><Who id={a.id} small /><b className="tnum">{bank[a.id]}</b> point<button className="btn btn-sm" onClick={() => setEdit({ owner:a.id })}>Brug til ønske</button></span>)}
+        <span className="text-xs text-muted basis-full">Point, der er optjent, uden at der er et ønske at spare op til, ligger her og bruges, når I opretter et nyt ønske.</span></div> : null; })()}
     {hist.length > 0 && <div className="mt-2"><button className="btn btn-sm btn-ghost" onClick={() => setShowHist(v => !v)}>{showHist ? 'Skjul' : 'Vis'} leverede ønsker ({hist.length})</button>
       {showHist && <ul className="flex flex-col gap-1 mt-1">{hist.map(w => <li key={w.id} className="flex items-center gap-2 text-sm"><Icon name="check" size={14} className="text-good shrink-0" /><span className="truncate flex-1">{w.title} <span className="text-muted">· {nm(w.owner)}{w.giver ? ` → ${nm(w.giver)}` : ''}</span></span><span className="text-xs text-muted tnum">{fmtShort(parse(w.redeemed))}</span></li>)}</ul>}</div>}
     {edit && <WishModal init={edit} onClose={() => setEdit(null)} />}
@@ -2331,14 +2376,16 @@ function Pligter() {
   const move = (task, status, doer) => up(d => {
     const tt = d.tasks.find(x => x.id === task.id); if (!tt) return d;
     const today = iso(new Date()); const wasDone = tt.status === 'done'; let ledger = d.ledger, done = d.done, doneDate = tt.doneDate || null;
-    if (wasDone && status !== 'done') { ledger = ledger.filter(l => !(l.taskId === tt.id && l.date === tt.doneDate)); done = done.filter(x => !(x.taskId === tt.id && x.date === tt.doneDate)); }
+    let wishes = d.parentWishes || [], bank = d.pointBank || {};
+    if (wasDone && status !== 'done') { ledger = ledger.filter(l => !(l.taskId === tt.id && l.date === tt.doneDate)); done.filter(x => x.taskId === tt.id && x.date === tt.doneDate).forEach(x => { const r = reverseAlloc(x.alloc, wishes, bank); wishes = r.wishes; bank = r.bank; }); done = done.filter(x => !(x.taskId === tt.id && x.date === tt.doneDate)); }
     if (status === 'done' && !wasDone) {
       doneDate = today; const ids = doer ? [].concat(doer) : resolveWho(d.members, memsOf(tt));
-      done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today, pts:tt.weight || 1 }];
+      let allocs = []; ids.filter(id => isAdultId(d, id)).forEach(id => { const r = allocPoints(d, id, tt.weight || 1, wishes, bank); wishes = r.wishes; bank = r.bank; allocs = allocs.concat(r.alloc); });
+      done = [...done, { id:uid(), taskId:tt.id, title:tt.title, who:ids, date:today, pts:tt.weight || 1, alloc:allocs }];
       if (tt.reward > 0) { const kidIds = ids.filter(id => (d.members.find(m => m.id === id) || {}).child); const share = Math.round(tt.reward / Math.max(1, ids.length) * 100) / 100; ledger = [...ledger, ...kidIds.map(id => ({ id:uid(), member:id, amount:share, label:tt.title, date:today, taskId:tt.id }))]; }
     }
     if (status !== 'done') doneDate = null;
-    return { ...d, tasks:d.tasks.map(t => t.id === tt.id ? { ...t, status, doneDate } : t), ledger, done };
+    return { ...d, tasks:d.tasks.map(t => t.id === tt.id ? { ...t, status, doneDate } : t), ledger, done, parentWishes:wishes, pointBank:bank };
   });
   const finish = t => { const m = memsOf(t); if (t.status !== 'done' && m.length > 1 && !m.includes('all')) { setDoers([]); setAsk(t); } else move(t, t.status === 'done' ? 'todo' : 'done'); };
   const oneOffDone = db.tasks.filter(t => t.status === 'done' && taskRepeat(t) === 'none');
